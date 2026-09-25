@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #FBF9F6;
+  --foreground: #18181B;
+  --font-cormorant: 'Cormorant Garamond', Georgia, serif;
+  --font-inter: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-[#FBF9F6] text-[#18181B] antialiased selection:bg-[#221A13] selection:text-[#FAF8F5];
+    font-family: var(--font-inter);
+  }
+
+  h1, h2, h3, .font-editorial {
+    font-family: var(--font-cormorant);
+  }
+}
+
+/* Luxury Editorial Styling Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 218, 206, 0.6);
+}
+
+.glass-panel-dark {
+  background: rgba(24, 24, 27, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(60, 60, 68, 0.5);
+}
+
+.editorial-heading {
+  font-family: var(--font-cormorant);
+  letter-spacing: -0.02em;
+  font-weight: 500;
+}
+
+/* Myntra-Style Luxury Garment Box */
+.garment-card {
+  @apply relative overflow-hidden rounded-2xl bg-white border border-[#EBE5DB] transition-all duration-300;
+  box-shadow: 0 4px 20px -6px rgba(0, 0, 0, 0.04);
+}
+
+.garment-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 30px -10px rgba(0, 0, 0, 0.08);
+  border-color: #D6C7B7;
+}
+
+/* Custom Minimalist Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F4EFEA;
+}
+::-webkit-scrollbar-thumb {
+  background: #D6C7B7;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #B89F88;
+}
+
+/* Mobile Safe Bottom Spacing */
+.safe-bottom-padding {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Subtle Shimmer for AI Scanning Animation */
+@keyframes luxuryShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.ai-scan-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: luxuryShimmer 2.2s infinite;
+}
