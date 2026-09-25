@@ -39,6 +39,10 @@ export default function WardrobePage() {
 
   useEffect(() => {
     fetchItems();
+
+    const handleNewItem = () => fetchItems();
+    window.addEventListener('aureve:item-added', handleNewItem);
+    return () => window.removeEventListener('aureve:item-added', handleNewItem);
   }, []);
 
   useEffect(() => {
@@ -141,20 +145,10 @@ export default function WardrobePage() {
         </div>
 
         <div className="flex items-center space-x-2.5">
-          {items.length === 0 && (
-            <button
-              onClick={handleSeedStarterWardrobe}
-              className="inline-flex items-center space-x-1.5 px-4 py-2.5 rounded-full bg-[#F4EFEA] hover:bg-[#E8DFD5] text-[#5E4633] text-xs font-semibold border border-[#E8DFD5] transition-all"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Seed Classic Wardrobe</span>
-            </button>
-          )}
-
           <button
             type="button"
             onClick={() => setIsAddModalOpen(true)}
-            className="inline-flex items-center space-x-2 bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] px-5 py-2.5 rounded-full text-xs font-semibold tracking-wide transition-all shadow-md active:scale-95"
+            className="inline-flex items-center space-x-2 bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] px-6 py-2.5 rounded-full text-xs font-semibold tracking-wide transition-all shadow-md active:scale-95"
           >
             <Plus className="w-4 h-4" />
             <span>+ ADD CLOTHING</span>

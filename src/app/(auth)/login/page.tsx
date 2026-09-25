@@ -56,8 +56,7 @@ export default function LoginPage() {
       }
 
       // Success -> Redirect to dashboard
-      router.push('/dashboard');
-      router.refresh();
+      window.location.href = '/dashboard';
     } catch (err) {
       console.error(err);
       setError('A network error occurred. Please try again.');
@@ -80,8 +79,7 @@ export default function LoginPage() {
       });
 
       if (loginRes.ok) {
-        router.push('/dashboard');
-        router.refresh();
+        window.location.href = '/dashboard';
         return;
       }
 
@@ -97,8 +95,7 @@ export default function LoginPage() {
       });
 
       if (regRes.ok) {
-        router.push('/dashboard');
-        router.refresh();
+        window.location.href = '/dashboard';
       } else {
         const d = await regRes.json();
         setError(d.error || 'Demo login could not be initiated.');

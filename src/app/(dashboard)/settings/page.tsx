@@ -53,6 +53,24 @@ export default function SettingsPage() {
     }
   };
 
+  const handleClearWardrobe = async () => {
+    if (!confirm('Are you sure you want to completely empty your wardrobe? All clothes and saved outfits will be removed.')) {
+      return;
+    }
+    setIsResetting(true);
+    try {
+      const res = await fetch('/api/wardrobe/clear', { method: 'POST' });
+      if (res.ok) {
+        setActionMessage('Wardrobe has been completely emptied.');
+        setTimeout(() => setActionMessage(''), 3000);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   const handleExportData = async () => {
     try {
       const res = await fetch('/api/wardrobe?includeArchived=true');
@@ -163,15 +181,16 @@ export default function SettingsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={handleSeedWardrobe}
-            className="p-4 rounded-2xl bg-[#FAF8F5] hover:bg-[#F4EFEA] border border-[#EBE5DB] text-left transition-all space-y-1"
+            onClick={handleClearWardrobe}
+            disabled={isResetting}
+            className="p-4 rounded-2xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-left transition-all space-y-1"
           >
-            <div className="flex items-center space-x-2 font-semibold text-xs text-[#18181B]">
-              <RefreshCw className="w-4 h-4 text-[#9A7B5F]" />
-              <span>Seed Classic Indian Wardrobe</span>
+            <div className="flex items-center space-x-2 font-semibold text-xs text-rose-800">
+              <Trash2 className="w-4 h-4 text-rose-700" />
+              <span>Empty / Reset Wardrobe</span>
             </div>
-            <p className="text-[11px] text-[#7E6047]">
-              Add curated linen shirts, chinos, raw denim, and sneakers to your existing closet.
+            <p className="text-[11px] text-rose-600">
+              Remove all clothes and start completely fresh from 0 items.
             </p>
           </button>
 

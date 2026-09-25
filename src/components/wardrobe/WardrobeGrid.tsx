@@ -123,36 +123,29 @@ export function WardrobeGrid({
         </div>
       ) : filteredItems.length === 0 ? (
         /* Empty State */
-        <div className="bg-white rounded-3xl border border-[#EBE5DB] p-8 sm:p-12 text-center max-w-md mx-auto my-8">
-          <div className="w-16 h-16 rounded-full bg-[#F4EFEA] text-[#7E6047] flex items-center justify-center mx-auto mb-4 border border-[#E8DFD5]">
+        <div className="bg-white rounded-3xl border border-[#EBE5DB] p-8 sm:p-12 text-center max-w-lg mx-auto my-8 space-y-5 shadow-xs">
+          <div className="w-16 h-16 rounded-full bg-[#FAF8F5] text-[#18181B] flex items-center justify-center mx-auto border border-[#E8DFD5] shadow-xs">
             <Sparkles className="w-8 h-8 text-[#9A7B5F]" />
           </div>
-          <h3 className="font-serif text-2xl font-semibold text-[#18181B] mb-2">
-            Your wardrobe is waiting.
-          </h3>
-          <p className="text-xs sm:text-sm text-[#7E6047] mb-6 leading-relaxed">
-            {searchQuery || formalityFilter !== 'all'
-              ? 'No pieces match your active filter. Try clearing the search or filters.'
-              : 'Add your shirts, trousers, and shoes so AUREVÉ can curate clean, effortless outfits for you.'}
-          </p>
+          <div>
+            <h3 className="font-serif text-2xl sm:text-3xl font-semibold text-[#18181B] mb-2">
+              Your wardrobe is empty.
+            </h3>
+            <p className="text-xs sm:text-sm text-[#7E6047] leading-relaxed max-w-md mx-auto">
+              {searchQuery || formalityFilter !== 'all'
+                ? 'No pieces match your active filter. Try clearing your search.'
+                : 'Come on, start adding pictures of your clothes! Take photos using your camera or pick from your phone gallery/laptop files.'}
+            </p>
+          </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button
               onClick={onOpenAddModal}
-              className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] px-5 py-2.5 rounded-full text-xs font-semibold tracking-wide transition-all shadow-sm"
+              className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] px-6 py-3 rounded-full text-xs font-semibold tracking-wide transition-all shadow-md active:scale-95"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Add your first piece</span>
+              <span>+ Take Photo or Upload Clothes</span>
             </button>
-
-            {onSeedDemoWardrobe && (
-              <button
-                onClick={onSeedDemoWardrobe}
-                className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 bg-[#F4EFEA] hover:bg-[#E8DFD5] text-[#5E4633] px-4 py-2.5 rounded-full text-xs font-medium border border-[#E8DFD5] transition-all"
-              >
-                <span>Load Starter Wardrobe</span>
-              </button>
-            )}
           </div>
         </div>
       ) : (

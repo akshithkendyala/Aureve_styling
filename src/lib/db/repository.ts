@@ -11,8 +11,7 @@ import {
 import { supabaseAdmin, isSupabaseConfigured } from './supabase';
 import { SAMPLE_INDIAN_WARDROBE } from '@/lib/ai/sampleWardrobe';
 
-// In-Memory / Local Cache Store for development & fallback when Supabase is not connected
-// Keyed strictly by userId to guarantee isolation
+// In-Memory / Local Cache Store for development & fallback when Supabase tables are not yet created
 interface InMemoryStore {
   users: Map<string, User>; // id -> user
   usersByMobile: Map<string, string>; // mobile -> id
@@ -22,7 +21,6 @@ interface InMemoryStore {
   feedback: Map<string, OutfitFeedback[]>; // userId -> feedback
 }
 
-// Global store instance preserved across dev hot-reloads
 declare global {
   var __aureve_db__: InMemoryStore | undefined;
 }
@@ -40,6 +38,14 @@ if (process.env.NODE_ENV !== 'production') {
   global.__aureve_db__ = dbStore;
 }
 
+function generateId(): string {
+  try {
+    return randomUUID();
+  } catch {
+    return `id_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  }
+}
+
 export const Repository = {
   // ============================================================================
   // USER AUTHENTICATION & PROFILES
@@ -53,9 +59,14 @@ export const Repository = {
           .select('*')
           .eq('mobile_number', mobile)
           .maybeSingle();
-        if (!error && data) return data as User;
+
+        if (!error && data) {
+          return data as User;
+        } else if (error && error.code !== 'PGRST116') {
+          console.warn('Supabase findUserByMobile note:', error.message);
+        }
       } catch (err) {
-        console.error('Supabase findUserByMobile error, falling back to local store:', err);
+        console.warn('Supabase query exception, using local store fallback:', err);
       }
     }
 
@@ -72,9 +83,10 @@ export const Repository = {
           .select('*')
           .eq('id', id)
           .maybeSingle();
+
         if (!error && data) return data as User;
       } catch (err) {
-        console.error('Supabase findUserById error, fallback:', err);
+        console.warn('Supabase findUserById exception:', err);
       }
     }
 
@@ -82,14 +94,7 @@ export const Repository = {
   },
 
   async createUser(name: string, mobileNumber: string, pinHash: string): Promise<User> {
-    const newUser: User = {
-      id: isSupabaseConfigured ? undefined as any : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
-      name,
-      mobile_number: mobileNumber,
-      pin_hash: pinHash,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const userId = generateId();
 
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
@@ -103,36 +108,49 @@ export const Repository = {
           .select('*')
           .single();
 
-        if (error) throw error;
-        const created = data as User;
+        if (!error && data) {
+          const created = data as User;
 
-        // Create default profile in Supabase
-        await supabaseAdmin.from('profiles').insert({
-          user_id: created.id,
-          city: 'Mumbai',
-          preferred_fit: 'Regular',
-          favorite_colors: ['Navy Blue', 'White', 'Olive Green', 'Charcoal'],
-          avoided_colors: ['Neon Green', 'Bright Orange'],
-          style_preferences: ['Smart Casual', 'Minimal', 'Modern Indian'],
-          comfort_preference: 'Balanced',
-        });
+          // Create default profile in Supabase
+          try {
+            await supabaseAdmin.from('profiles').insert({
+              user_id: created.id,
+              city: 'Mumbai',
+              preferred_fit: 'Regular',
+              favorite_colors: ['Navy Blue', 'White', 'Olive Green', 'Charcoal'],
+              avoided_colors: ['Neon Green', 'Bright Orange'],
+              style_preferences: ['Smart Casual', 'Minimal', 'Modern Indian'],
+              comfort_preference: 'Balanced',
+            });
+          } catch (pErr) {
+            console.warn('Error creating profile in Supabase:', pErr);
+          }
 
-        return created;
+          return created;
+        } else {
+          console.warn('Supabase createUser failed (tables may need to be created in Supabase SQL editor):', error?.message);
+        }
       } catch (err) {
-        console.error('Supabase createUser error, using local fallback:', err);
+        console.warn('Supabase createUser exception, using local memory fallback:', err);
       }
     }
 
-    if (!newUser.id) {
-      newUser.id = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    }
+    // Local in-memory store fallback
+    const newUser: User = {
+      id: userId,
+      name,
+      mobile_number: mobileNumber,
+      pin_hash: pinHash,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
 
     dbStore.users.set(newUser.id, newUser);
     dbStore.usersByMobile.set(mobileNumber, newUser.id);
 
-    // Create default profile in local store
+    // Create default profile
     const defaultProfile: UserProfile = {
-      id: `prof_${Date.now()}`,
+      id: generateId(),
       user_id: newUser.id,
       city: 'Mumbai',
       height: "5'10\"",
@@ -147,9 +165,6 @@ export const Repository = {
     };
     dbStore.profiles.set(newUser.id, defaultProfile);
 
-    // Automatically seed default realistic wardrobe for user so they have a ready experience
-    await this.seedDefaultWardrobe(newUser.id);
-
     return newUser;
   },
 
@@ -163,7 +178,7 @@ export const Repository = {
           .maybeSingle();
         if (!error && data) return data as UserProfile;
       } catch (err) {
-        console.error('Supabase getUserProfile error:', err);
+        console.warn('Supabase getUserProfile error:', err);
       }
     }
 
@@ -173,7 +188,7 @@ export const Repository = {
   async upsertUserProfile(userId: string, profileData: Partial<UserProfile>): Promise<UserProfile> {
     const existing = await this.getUserProfile(userId);
     const updated: UserProfile = {
-      id: existing?.id || `prof_${Date.now()}`,
+      id: existing?.id || generateId(),
       user_id: userId,
       height: profileData.height ?? existing?.height,
       weight: profileData.weight ?? existing?.weight,
@@ -204,7 +219,7 @@ export const Repository = {
           .single();
         if (!error && data) return data as UserProfile;
       } catch (err) {
-        console.error('Supabase upsertUserProfile error:', err);
+        console.warn('Supabase upsertUserProfile error:', err);
       }
     }
 
@@ -258,7 +273,7 @@ export const Repository = {
           return items;
         }
       } catch (err) {
-        console.error('Supabase getWardrobeItems error:', err);
+        console.warn('Supabase getWardrobeItems error:', err);
       }
     }
 
@@ -298,7 +313,7 @@ export const Repository = {
           .maybeSingle();
         if (!error && data) return data as WardrobeItem;
       } catch (err) {
-        console.error('Supabase getWardrobeItemById error:', err);
+        console.warn('Supabase getWardrobeItemById error:', err);
       }
     }
 
@@ -308,7 +323,7 @@ export const Repository = {
 
   async addWardrobeItem(userId: string, item: Omit<WardrobeItem, 'id' | 'user_id' | 'created_at' | 'times_worn'>): Promise<WardrobeItem> {
     const newItem: WardrobeItem = {
-      id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: generateId(),
       user_id: userId,
       times_worn: 0,
       created_at: new Date().toISOString(),
@@ -342,7 +357,7 @@ export const Repository = {
           .single();
         if (!error && data) return data as WardrobeItem;
       } catch (err) {
-        console.error('Supabase addWardrobeItem error:', err);
+        console.warn('Supabase addWardrobeItem error:', err);
       }
     }
 
@@ -371,7 +386,7 @@ export const Repository = {
           .single();
         if (!error && data) return data as WardrobeItem;
       } catch (err) {
-        console.error('Supabase updateWardrobeItem error:', err);
+        console.warn('Supabase updateWardrobeItem error:', err);
       }
     }
 
@@ -398,7 +413,7 @@ export const Repository = {
           .eq('id', itemId);
         if (!error) return true;
       } catch (err) {
-        console.error('Supabase deleteWardrobeItem error:', err);
+        console.warn('Supabase deleteWardrobeItem error:', err);
       }
     }
 
@@ -452,7 +467,7 @@ export const Repository = {
         await supabaseAdmin.from('wardrobe_items').delete().eq('user_id', userId);
         await supabaseAdmin.from('outfits').delete().eq('user_id', userId);
       } catch (err) {
-        console.error('Supabase resetUserWardrobe error:', err);
+        console.warn('Supabase resetUserWardrobe error:', err);
       }
     }
     dbStore.wardrobe.set(userId, []);
@@ -466,7 +481,7 @@ export const Repository = {
 
   async saveOutfit(userId: string, outfitData: Omit<Outfit, 'id' | 'user_id' | 'created_at'>): Promise<Outfit> {
     const newOutfit: Outfit = {
-      id: `outfit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: generateId(),
       user_id: userId,
       created_at: new Date().toISOString(),
       ...outfitData,
@@ -507,7 +522,7 @@ export const Repository = {
           } as Outfit;
         }
       } catch (err) {
-        console.error('Supabase saveOutfit error:', err);
+        console.warn('Supabase saveOutfit error:', err);
       }
     }
 
@@ -555,7 +570,7 @@ export const Repository = {
           }));
         }
       } catch (err) {
-        console.error('Supabase getUserOutfits error:', err);
+        console.warn('Supabase getUserOutfits error:', err);
       }
     }
 
@@ -563,7 +578,6 @@ export const Repository = {
     const wardrobe = dbStore.wardrobe.get(userId) || [];
     const wardrobeMap = new Map(wardrobe.map((i) => [i.id, i]));
 
-    // Populate item references
     return outfits.map((o) => ({
       ...o,
       items: o.items.map((it) => ({
@@ -579,7 +593,7 @@ export const Repository = {
         await supabaseAdmin.from('outfits').delete().eq('user_id', userId).eq('id', outfitId);
         return true;
       } catch (err) {
-        console.error('Supabase deleteOutfit error:', err);
+        console.warn('Supabase deleteOutfit error:', err);
       }
     }
 
@@ -594,7 +608,7 @@ export const Repository = {
 
   async recordFeedback(userId: string, feedback: Omit<OutfitFeedback, 'id' | 'user_id' | 'created_at'>): Promise<OutfitFeedback> {
     const newFeedback: OutfitFeedback = {
-      id: `fb_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: generateId(),
       user_id: userId,
       created_at: new Date().toISOString(),
       ...feedback,
@@ -615,7 +629,7 @@ export const Repository = {
           .single();
         if (!error && data) return data as OutfitFeedback;
       } catch (err) {
-        console.error('Supabase recordFeedback error:', err);
+        console.warn('Supabase recordFeedback error:', err);
       }
     }
 
@@ -658,9 +672,7 @@ export const Repository = {
     const mostWornItem = sortedByWear.length > 0 && (sortedByWear[0].times_worn || 0) > 0 ? sortedByWear[0] : null;
     const leastWornItem = sortedByWear.length > 1 ? sortedByWear[sortedByWear.length - 1] : null;
 
-    // Generate smart contextual style insights
     const styleInsights: string[] = [];
-
     if (dominantColors.length > 0) {
       styleInsights.push(`You have a strong affinity for ${dominantColors[0].color} tones in your core collection.`);
     }
@@ -678,8 +690,6 @@ export const Repository = {
 
     if (footwear >= 2) {
       styleInsights.push('Your footwear lineup seamlessly bridges casual comfort with smart-casual elevation.');
-    } else if (footwear === 1) {
-      styleInsights.push('Adding a pair of brown leather loafers or clean white sneakers will expand your outfit versatility.');
     }
 
     return {

@@ -1,6 +1,34 @@
 import { AIClassificationResult, MainCategory } from '@/lib/types';
 
 /**
+ * Fetch remote image URL and convert to base64 inline data for Gemini Vision
+ */
+async function getImageInlineData(imageData: string): Promise<{ mimeType: string; base64Data: string } | null> {
+  try {
+    if (imageData.startsWith('data:image/')) {
+      const mimeMatch = imageData.match(/^data:(image\/[a-zA-Z+]+);base64,/);
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const base64Data = imageData.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
+      return { mimeType, base64Data };
+    } else if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
+      const response = await fetch(imageData);
+      if (!response.ok) return null;
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      const mimeType = contentType.split(';')[0].trim();
+      return {
+        mimeType: mimeType.startsWith('image/') ? mimeType : 'image/jpeg',
+        base64Data: buffer.toString('base64'),
+      };
+    }
+  } catch (err) {
+    console.warn('Could not extract image buffer for Gemini vision:', err);
+  }
+  return null;
+}
+
+/**
  * Classify a clothing item from an image URL or base64 string using AI vision
  */
 export async function classifyClothingImage(
@@ -11,49 +39,79 @@ export async function classifyClothingImage(
 
   if (geminiApiKey) {
     try {
+      const imagePayload = await getImageInlineData(imageData);
+
+      const promptText = `
+You are AUREVÉ's expert fashion vision analyst and tailor.
+Carefully examine this real garment image and extract precise fashion characteristics.
+
+CRITICAL CLASSIFICATION INSTRUCTIONS:
+1. DISTINGUISH SUBCATEGORIES ACCURATELY:
+   - "t-shirt": Crewneck / round neck or V-neck, casual knit tee without full collar and buttons.
+   - "shirt": Button-down front, formal/casual collar, cuffs, woven fabric (e.g. Oxford, Linen, Poplin, Denim shirt).
+   - "polo": T-shirt with a structured collar and 2-3 button placket.
+   - "overshirt": Heavy shirt jacket / shacket, thick cotton or twill worn open or closed.
+   - "kurta": Indian ethnic long or short kurta tunic.
+   - "jeans": Denim cotton with visible twill texture, pockets, and rivets.
+   - "trousers": Formal or dress pants, pressed creases, pleated or flat front.
+   - "chinos": Casual cotton trousers, flat-front, casual pockets.
+   - "sneakers": Athletic or casual minimal leather/canvas trainers.
+   - "loafers": Slip-on leather shoes (penny loafers, tassels, horsebit).
+   - "kolhapuris": Handcrafted Indian leather sandals or ethnic chappals.
+   - "watch": Wristwatch with dial and strap.
+
+2. FIT DETECTION:
+   - "Oversized": Dropped shoulders, very wide chest/sleeves, relaxed baggy silhouette.
+   - "Relaxed": Easy breezy drape, loose through waist and arms without tight tapering.
+   - "Regular": Classic standard proportion, straight cut.
+   - "Slim": Fitted close to torso/arms/thighs.
+   - "Tailored": Structured waist/shoulder definition.
+
+3. COLOR & MATERIAL:
+   - Identify the exact primary color (e.g. "Sky Blue", "Navy Blue", "Olive Green", "Charcoal Grey", "Sand Beige", "Crisp White", "Dark Indigo", "Burgundy", "Terracotta", "Forest Green", "Off-White", "Black").
+   - Secondary accent colors if present.
+   - Detect fabric material: "100% Cotton", "Pure Linen", "Raw Denim", "Merino Wool", "Full Grain Leather", "Cotton Twill", "Linen Blend", "Silk", "Knit Cotton", etc.
+
+Return ONLY strict, valid JSON with NO markdown formatting, matching this exact JSON schema:
+{
+  "category": "tops" | "bottoms" | "layers" | "footwear" | "accessories",
+  "subcategory": "shirt" | "t-shirt" | "polo" | "overshirt" | "kurta" | "jeans" | "chinos" | "trousers" | "shorts" | "track_pants" | "jacket" | "hoodie" | "sweater" | "sneakers" | "loafers" | "formal_shoes" | "sandals" | "kolhapuris" | "watch" | "belt" | "sunglasses",
+  "name": "Concise Descriptive Title (e.g. Olive Green Relaxed Overshirt, Sky Blue Linen Button-Down, Dark Indigo Straight Jeans)",
+  "primary_color": "Exact Color Name (e.g. Olive Green, Sky Blue, Charcoal, Sand Beige, Crisp White)",
+  "secondary_colors": ["optional secondary colors"],
+  "pattern": "Solid" | "Striped" | "Checked" | "Textured" | "Printed" | "Graphic",
+  "material": "Cotton" | "Pure Linen" | "Denim" | "Wool" | "Full Grain Leather" | "Cotton Twill",
+  "fit": "Regular" | "Slim" | "Relaxed" | "Oversized" | "Tailored",
+  "style": "Smart Casual" | "Minimal" | "Modern Indian" | "Casual" | "Streetwear" | "Formal",
+  "formality": "Casual" | "Smart Casual" | "Semi-Formal" | "Formal" | "Festive",
+  "season": ["Summer", "All-Season", "Winter", "Monsoon"]
+}
+`;
+
+      const parts: any[] = [{ text: promptText }];
+      if (imagePayload) {
+        parts.push({
+          inline_data: {
+            mime_type: imagePayload.mimeType,
+            data: imagePayload.base64Data,
+          },
+        });
+      } else {
+        parts.push({
+          text: `Garment metadata or filename hint: ${hintName || 'Real wardrobe clothing item'}. Analyze appropriate attributes.`,
+        });
+      }
+
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `You are AUREVÉ's expert AI fashion classifier specializing in modern Indian men's and contemporary wardrobe analysis.
-Analyze this garment photo and output strict JSON matching this exact structure:
-{
-  "category": "tops" | "bottoms" | "layers" | "footwear" | "accessories",
-  "subcategory": "shirt" | "t-shirt" | "polo" | "overshirt" | "kurta" | "jeans" | "chinos" | "trousers" | "shorts" | "jacket" | "hoodie" | "sweater" | "sneakers" | "loafers" | "formal_shoes" | "sandals" | "kolhapuris" | "watch" | "belt" | "sunglasses",
-  "name": "Short descriptive title (e.g., Sky Blue Oxford Shirt)",
-  "primary_color": "Main color (e.g., Sky Blue, Navy, Olive, Charcoal, Beige, White)",
-  "secondary_colors": ["optional secondary colors"],
-  "pattern": "Solid" | "Striped" | "Checked" | "Textured" | "Printed",
-  "material": "Cotton" | "Linen" | "Denim" | "Wool" | "Leather" | "Poly-Cotton",
-  "fit": "Regular" | "Slim" | "Relaxed" | "Tailored" | "Oversized",
-  "style": "Smart Casual" | "Minimal" | "Modern Indian" | "Casual" | "Formal",
-  "formality": "Casual" | "Smart Casual" | "Semi-Formal" | "Formal" | "Festive",
-  "season": ["Summer", "All-Season", "Winter", "Monsoon"]
-}
-Return ONLY pure valid JSON, no markdown backticks, no commentary.`,
-                  },
-                  imageData.startsWith('data:image')
-                    ? {
-                        inline_data: {
-                          mime_type: imageData.substring(imageData.indexOf(':') + 1, imageData.indexOf(';')),
-                          data: imageData.substring(imageData.indexOf(',') + 1),
-                        },
-                      }
-                    : {
-                        text: `Image URL: ${imageData}. Garment hint: ${hintName || 'Modern wardrobe piece'}`,
-                      },
-                ],
-              },
-            ],
+            contents: [{ parts }],
             generationConfig: {
               responseMimeType: 'application/json',
-              temperature: 0.2,
+              temperature: 0.1,
             },
           }),
         }
@@ -72,7 +130,7 @@ Return ONLY pure valid JSON, no markdown backticks, no commentary.`,
               primary_color: parsed.primary_color || 'Neutral',
               secondary_colors: parsed.secondary_colors || [],
               pattern: parsed.pattern || 'Solid',
-              material: parsed.material || 'Cotton',
+              material: parsed.material || '100% Cotton',
               fit: parsed.fit || 'Regular',
               style: parsed.style || 'Smart Casual',
               formality: parsed.formality || 'Smart Casual',
@@ -82,11 +140,11 @@ Return ONLY pure valid JSON, no markdown backticks, no commentary.`,
         }
       }
     } catch (err) {
-      console.warn('Gemini vision API error, using intelligent visual heuristic analyzer:', err);
+      console.warn('Gemini vision API error, using intelligent visual heuristic fallback:', err);
     }
   }
 
-  // Smart Contextual Heuristic Analyzer (Instant response fallback)
+  // Heuristic Fallback
   return fallbackHeuristicClassifier(imageData, hintName);
 }
 
@@ -170,7 +228,7 @@ function fallbackHeuristicClassifier(imageData: string, hintName?: string): AICl
   // Default Top (Shirt / T-shirt / Kurta)
   const isPolo = query.includes('polo');
   const isKurta = query.includes('kurta');
-  const isTee = query.includes('tee') || query.includes('t-shirt');
+  const isTee = query.includes('tee') || query.includes('t-shirt') || query.includes('tshirt');
   const isBlue = query.includes('blue') || query.includes('sky');
   const isOlive = query.includes('olive') || query.includes('green');
 

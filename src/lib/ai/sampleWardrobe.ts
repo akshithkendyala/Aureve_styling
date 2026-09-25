@@ -129,7 +129,7 @@ export const SAMPLE_INDIAN_WARDROBE: SampleItemSeed[] = [
     name: 'Raw Indigo Straight-Fit Jeans',
     category: 'bottoms',
     subcategory: 'jeans',
-    image_url: 'https://images.unsplash.com/photo-1542272604-780c96856592?auto=format&fit=crop&w=800&q=80',
+    image_url: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=800&q=80',
     primary_color: 'Dark Indigo',
     secondary_colors: ['Navy'],
     pattern: 'Solid Denim',

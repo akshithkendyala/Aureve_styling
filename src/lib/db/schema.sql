@@ -1,13 +1,14 @@
 -- ==============================================================================
--- AUREVÉ DATABASE SCHEMA
--- PostgreSQL / Supabase Schema with Row Level Security (RLS) & Strict Isolation
+-- AUREVÉ DATABASE SCHEMA FOR SUPABASE
+-- Run this complete script in your Supabase SQL Editor:
+-- Project Dashboard -> SQL Editor -> New Query -> Paste & Click Run
 -- ==============================================================================
 
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
 -- 1. USERS TABLE
-create table if not exists users (
+create table if not exists public.users (
     id uuid primary key default uuid_generate_v4(),
     name text not null,
     mobile_number text unique not null,
@@ -16,13 +17,12 @@ create table if not exists users (
     updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- Index for fast user lookup during login
-create index if not exists idx_users_mobile on users(mobile_number);
+create index if not exists idx_users_mobile on public.users(mobile_number);
 
 -- 2. USER PROFILES TABLE
-create table if not exists profiles (
+create table if not exists public.profiles (
     id uuid primary key default uuid_generate_v4(),
-    user_id uuid references users(id) on delete cascade unique not null,
+    user_id uuid references public.users(id) on delete cascade unique not null,
     height text,
     weight text,
     skin_tone text,
@@ -36,12 +36,12 @@ create table if not exists profiles (
     updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
-create index if not exists idx_profiles_user_id on profiles(user_id);
+create index if not exists idx_profiles_user_id on public.profiles(user_id);
 
 -- 3. WARDROBE ITEMS TABLE
-create table if not exists wardrobe_items (
+create table if not exists public.wardrobe_items (
     id uuid primary key default uuid_generate_v4(),
-    user_id uuid references users(id) on delete cascade not null,
+    user_id uuid references public.users(id) on delete cascade not null,
     image_url text not null,
     name text not null,
     category text not null, -- tops, bottoms, layers, footwear, accessories
@@ -62,14 +62,14 @@ create table if not exists wardrobe_items (
     updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
-create index if not exists idx_wardrobe_items_user_id on wardrobe_items(user_id);
-create index if not exists idx_wardrobe_items_category on wardrobe_items(user_id, category);
-create index if not exists idx_wardrobe_items_archived on wardrobe_items(user_id, is_archived);
+create index if not exists idx_wardrobe_items_user_id on public.wardrobe_items(user_id);
+create index if not exists idx_wardrobe_items_category on public.wardrobe_items(user_id, category);
+create index if not exists idx_wardrobe_items_archived on public.wardrobe_items(user_id, is_archived);
 
 -- 4. OUTFITS TABLE
-create table if not exists outfits (
+create table if not exists public.outfits (
     id uuid primary key default uuid_generate_v4(),
-    user_id uuid references users(id) on delete cascade not null,
+    user_id uuid references public.users(id) on delete cascade not null,
     occasion text not null,
     date text not null,
     time text,
@@ -82,42 +82,46 @@ create table if not exists outfits (
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
-create index if not exists idx_outfits_user_id on outfits(user_id);
-create index if not exists idx_outfits_date on outfits(user_id, date);
+create index if not exists idx_outfits_user_id on public.outfits(user_id);
+create index if not exists idx_outfits_date on public.outfits(user_id, date);
 
 -- 5. OUTFIT ITEMS (JUNCTION TABLE)
-create table if not exists outfit_items (
+create table if not exists public.outfit_items (
     id uuid primary key default uuid_generate_v4(),
-    outfit_id uuid references outfits(id) on delete cascade not null,
-    wardrobe_item_id uuid references wardrobe_items(id) on delete cascade not null,
+    outfit_id uuid references public.outfits(id) on delete cascade not null,
+    wardrobe_item_id uuid references public.wardrobe_items(id) on delete cascade not null,
     role text not null -- top, bottom, footwear, accessory, layer
 );
 
-create index if not exists idx_outfit_items_outfit_id on outfit_items(outfit_id);
-create index if not exists idx_outfit_items_wardrobe_item_id on outfit_items(wardrobe_item_id);
+create index if not exists idx_outfit_items_outfit_id on public.outfit_items(outfit_id);
+create index if not exists idx_outfit_items_wardrobe_item_id on public.outfit_items(wardrobe_item_id);
 
 -- 6. OUTFIT FEEDBACK TABLE
-create table if not exists outfit_feedback (
+create table if not exists public.outfit_feedback (
     id uuid primary key default uuid_generate_v4(),
-    user_id uuid references users(id) on delete cascade not null,
-    outfit_id uuid references outfits(id) on delete cascade not null,
+    user_id uuid references public.users(id) on delete cascade not null,
+    outfit_id uuid references public.outfits(id) on delete cascade not null,
     rating text not null, -- Loved it, Good, Average, Didn't like it
     feedback_tags jsonb default '[]'::jsonb,
     comment text,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
-create index if not exists idx_outfit_feedback_user_id on outfit_feedback(user_id);
-create index if not exists idx_outfit_feedback_outfit_id on outfit_feedback(outfit_id);
+create index if not exists idx_outfit_feedback_user_id on public.outfit_feedback(user_id);
+create index if not exists idx_outfit_feedback_outfit_id on public.outfit_feedback(outfit_id);
 
--- ROW LEVEL SECURITY (RLS) POLICIES
-alter table users enable row level security;
-alter table profiles enable row level security;
-alter table wardrobe_items enable row level security;
-alter table outfits enable row level security;
-alter table outfit_items enable row level security;
-alter table outfit_feedback enable row level security;
+-- ENABLE ROW LEVEL SECURITY
+alter table public.users enable row level security;
+alter table public.profiles enable row level security;
+alter table public.wardrobe_items enable row level security;
+alter table public.outfits enable row level security;
+alter table public.outfit_items enable row level security;
+alter table public.outfit_feedback enable row level security;
 
--- Storage Bucket for User Wardrobe Photos:
--- Path convention: /users/{user_id}/wardrobe/{item_id}/image
--- Configure in Supabase Storage with private access and user-authenticated policies.
+-- PERMISSIVE RLS POLICIES FOR BACKEND API
+create policy "Allow all operations for service role and backend on users" on public.users for all using (true) with check (true);
+create policy "Allow all operations for service role and backend on profiles" on public.profiles for all using (true) with check (true);
+create policy "Allow all operations for service role and backend on wardrobe_items" on public.wardrobe_items for all using (true) with check (true);
+create policy "Allow all operations for service role and backend on outfits" on public.outfits for all using (true) with check (true);
+create policy "Allow all operations for service role and backend on outfit_items" on public.outfit_items for all using (true) with check (true);
+create policy "Allow all operations for service role and backend on outfit_feedback" on public.outfit_feedback for all using (true) with check (true);
