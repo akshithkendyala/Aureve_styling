@@ -21,22 +21,26 @@ export default function DashboardLayout({
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function loadSession() {
       try {
         const res = await fetch('/api/auth/me');
         if (!res.ok) {
-          router.push('/login');
+          if (isMounted) router.push('/login');
           return;
         }
         const data = await res.json();
         if (data.authenticated && data.user) {
-          setUser(data.user);
-          setProfile(data.profile);
+          if (isMounted) {
+            setUser(data.user);
+            setProfile(data.profile);
+          }
 
           // Load weather for user's city
           const city = data.profile?.city || 'Mumbai';
           const weatherRes = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
-          if (weatherRes.ok) {
+          if (weatherRes.ok && isMounted) {
             const wData = await weatherRes.json();
             if (wData.weather) {
               setWeather({
@@ -46,18 +50,22 @@ export default function DashboardLayout({
             }
           }
         } else {
-          router.push('/login');
+          if (isMounted) router.push('/login');
         }
       } catch (err) {
         console.error(err);
-        router.push('/login');
+        if (isMounted) router.push('/login');
       } finally {
-        setIsLoadingAuth(false);
+        if (isMounted) setIsLoadingAuth(false);
       }
     }
 
     loadSession();
-  }, [router, pathname]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   const handleItemAdded = (item: WardrobeItem) => {
     // Dispatch custom event so active pages (wardrobe, dashboard) can refresh

@@ -8,24 +8,31 @@ import {
   WardrobeStats,
   MainCategory,
 } from '@/lib/types';
-import { supabaseAdmin, isSupabaseConfigured } from './supabase';
+import { supabase, supabaseAdmin, isSupabaseConfigured } from './supabase';
 import { SAMPLE_INDIAN_WARDROBE } from '@/lib/ai/sampleWardrobe';
+import {
+  normalizeMobileNumber,
+  mobileToSupabaseEmail,
+  pinToSupabasePassword,
+  hashPin,
+  verifyPin,
+} from '@/lib/auth/pin';
 
-// In-Memory / Local Cache Store for development & fallback when Supabase tables are not yet created
-interface InMemoryStore {
-  users: Map<string, User>; // id -> user
-  usersByMobile: Map<string, string>; // mobile -> id
-  profiles: Map<string, UserProfile>; // userId -> profile
-  wardrobe: Map<string, WardrobeItem[]>; // userId -> items
-  outfits: Map<string, Outfit[]>; // userId -> outfits
-  feedback: Map<string, OutfitFeedback[]>; // userId -> feedback
+// Strict Isolated User Store for local state / caching
+interface IsolatedStore {
+  users: Map<string, User>; // id -> User
+  usersByMobile: Map<string, string>; // clean mobile -> id
+  profiles: Map<string, UserProfile>; // userId -> UserProfile
+  wardrobe: Map<string, WardrobeItem[]>; // userId -> items[]
+  outfits: Map<string, Outfit[]>; // userId -> outfits[]
+  feedback: Map<string, OutfitFeedback[]>; // userId -> feedback[]
 }
 
 declare global {
-  var __aureve_db__: InMemoryStore | undefined;
+  var __aureve_db__: IsolatedStore | undefined;
 }
 
-const dbStore: InMemoryStore = global.__aureve_db__ || {
+const dbStore: IsolatedStore = global.__aureve_db__ || {
   users: new Map(),
   usersByMobile: new Map(),
   profiles: new Map(),
@@ -48,107 +55,283 @@ function generateId(): string {
 
 export const Repository = {
   // ============================================================================
-  // USER AUTHENTICATION & PROFILES
+  // USER AUTHENTICATION & LOOKUP
   // ============================================================================
 
+  /**
+   * Look up an existing user by their 10-digit mobile number in Supabase Auth
+   */
   async findUserByMobile(mobile: string): Promise<User | null> {
+    const cleanMobile = normalizeMobileNumber(mobile);
+    if (!cleanMobile) return null;
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
-        const { data, error } = await supabaseAdmin
-          .from('users')
-          .select('*')
-          .eq('mobile_number', mobile)
-          .maybeSingle();
+        const email = mobileToSupabaseEmail(cleanMobile);
+        const { data, error } = await supabaseAdmin.auth.admin.listUsers();
+        if (!error && data?.users) {
+          const found = data.users.find(
+            (u) =>
+              u.email === email ||
+              u.user_metadata?.mobile_number === cleanMobile
+          );
 
-        if (!error && data) {
-          return data as User;
-        } else if (error && error.code !== 'PGRST116') {
-          console.warn('Supabase findUserByMobile note:', error.message);
+          if (found) {
+            const user: User = {
+              id: found.id,
+              name: found.user_metadata?.name || 'Gentleman',
+              mobile_number: found.user_metadata?.mobile_number || cleanMobile,
+              created_at: found.created_at,
+              updated_at: found.updated_at,
+            };
+            dbStore.users.set(user.id, user);
+            dbStore.usersByMobile.set(cleanMobile, user.id);
+            return user;
+          }
         }
       } catch (err) {
-        console.warn('Supabase query exception, using local store fallback:', err);
+        console.warn('Supabase Auth findUserByMobile note:', err);
+      }
+
+      // Check users table in Supabase if present
+      try {
+        const { data: dbUser, error: dbErr } = await supabaseAdmin
+          .from('users')
+          .select('*')
+          .eq('mobile_number', cleanMobile)
+          .maybeSingle();
+
+        if (!dbErr && dbUser) {
+          const user: User = {
+            id: dbUser.id,
+            name: dbUser.name,
+            mobile_number: dbUser.mobile_number,
+            pin_hash: dbUser.pin_hash,
+            created_at: dbUser.created_at,
+            updated_at: dbUser.updated_at,
+          };
+          dbStore.users.set(user.id, user);
+          dbStore.usersByMobile.set(cleanMobile, user.id);
+          return user;
+        }
+      } catch (err) {
+        // Table may not exist yet
       }
     }
 
-    const userId = dbStore.usersByMobile.get(mobile);
+    // Local fallback store
+    const userId = dbStore.usersByMobile.get(cleanMobile);
     if (!userId) return null;
     return dbStore.users.get(userId) || null;
   },
 
+  /**
+   * Look up an authenticated user by their unique UUID in Supabase Auth
+   */
   async findUserById(id: string): Promise<User | null> {
+    if (!id) return null;
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin.auth.admin.getUserById(id);
+        if (!error && data?.user) {
+          const u = data.user;
+          const user: User = {
+            id: u.id,
+            name: u.user_metadata?.name || 'Gentleman',
+            mobile_number: u.user_metadata?.mobile_number || '',
+            created_at: u.created_at,
+            updated_at: u.updated_at,
+          };
+          dbStore.users.set(user.id, user);
+          if (user.mobile_number) {
+            dbStore.usersByMobile.set(user.mobile_number, user.id);
+          }
+          return user;
+        }
+      } catch (err) {
+        console.warn('Supabase Auth findUserById note:', err);
+      }
+
+      // Check users table in Supabase if present
+      try {
+        const { data: dbUser, error: dbErr } = await supabaseAdmin
           .from('users')
           .select('*')
           .eq('id', id)
           .maybeSingle();
 
-        if (!error && data) return data as User;
+        if (!dbErr && dbUser) {
+          const user: User = {
+            id: dbUser.id,
+            name: dbUser.name,
+            mobile_number: dbUser.mobile_number,
+            pin_hash: dbUser.pin_hash,
+            created_at: dbUser.created_at,
+            updated_at: dbUser.updated_at,
+          };
+          dbStore.users.set(user.id, user);
+          if (user.mobile_number) {
+            dbStore.usersByMobile.set(user.mobile_number, user.id);
+          }
+          return user;
+        }
       } catch (err) {
-        console.warn('Supabase findUserById exception:', err);
+        // Table may not exist yet
       }
     }
 
     return dbStore.users.get(id) || null;
   },
 
-  async createUser(name: string, mobileNumber: string, pinHash: string): Promise<User> {
-    const userId = generateId();
+  /**
+   * Verify user credentials (mobile + PIN) against Supabase Auth
+   */
+  async verifyCredentials(mobile: string, pin: string): Promise<{ success: boolean; user?: User; error?: string }> {
+    const cleanMobile = normalizeMobileNumber(mobile);
+    if (!cleanMobile) {
+      return { success: false, error: 'Invalid mobile number.' };
+    }
 
-    if (isSupabaseConfigured && supabaseAdmin) {
+    if (isSupabaseConfigured && supabase) {
+      const email = mobileToSupabaseEmail(cleanMobile);
+      const password = pinToSupabasePassword(pin);
+
       try {
-        const { data, error } = await supabaseAdmin
-          .from('users')
-          .insert({
-            name,
-            mobile_number: mobileNumber,
-            pin_hash: pinHash,
-          })
-          .select('*')
-          .single();
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-        if (!error && data) {
-          const created = data as User;
-
-          // Create default profile in Supabase
-          try {
-            await supabaseAdmin.from('profiles').insert({
-              user_id: created.id,
-              city: 'Mumbai',
-              preferred_fit: 'Regular',
-              favorite_colors: ['Navy Blue', 'White', 'Olive Green', 'Charcoal'],
-              avoided_colors: ['Neon Green', 'Bright Orange'],
-              style_preferences: ['Smart Casual', 'Minimal', 'Modern Indian'],
-              comfort_preference: 'Balanced',
-            });
-          } catch (pErr) {
-            console.warn('Error creating profile in Supabase:', pErr);
-          }
-
-          return created;
-        } else {
-          console.warn('Supabase createUser failed (tables may need to be created in Supabase SQL editor):', error?.message);
+        if (!error && data?.user) {
+          const user: User = {
+            id: data.user.id,
+            name: data.user.user_metadata?.name || 'Gentleman',
+            mobile_number: data.user.user_metadata?.mobile_number || cleanMobile,
+            created_at: data.user.created_at,
+            updated_at: data.user.updated_at,
+          };
+          dbStore.users.set(user.id, user);
+          dbStore.usersByMobile.set(cleanMobile, user.id);
+          return { success: true, user };
         }
       } catch (err) {
-        console.warn('Supabase createUser exception, using local memory fallback:', err);
+        console.warn('Supabase signInWithPassword exception:', err);
       }
     }
 
-    // Local in-memory store fallback
+    // Check database / fallback store if Supabase Auth check didn't succeed
+    const user = await this.findUserByMobile(cleanMobile);
+    if (!user) {
+      return { success: false, error: 'No account found with this mobile number. Please register your account.' };
+    }
+
+    if (user.pin_hash) {
+      const isValid = await verifyPin(pin, user.pin_hash);
+      if (isValid) {
+        return { success: true, user };
+      }
+    }
+
+    return { success: false, error: 'Invalid mobile number or PIN.' };
+  },
+
+  /**
+   * Register a new user in Supabase Auth, create default profile, and seed starter wardrobe
+   */
+  async createUser(name: string, mobileNumber: string, pin: string): Promise<User> {
+    const cleanMobile = normalizeMobileNumber(mobileNumber);
+    const pinHash = await hashPin(pin);
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      const email = mobileToSupabaseEmail(cleanMobile);
+      const password = pinToSupabasePassword(pin);
+
+      // Create in Supabase Auth
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          name: name.trim(),
+          mobile_number: cleanMobile,
+        },
+      });
+
+      if (authError) {
+        throw new Error(authError.message || 'Could not create account in Supabase Auth');
+      }
+
+      const createdUser: User = {
+        id: authData.user.id,
+        name: name.trim(),
+        mobile_number: cleanMobile,
+        pin_hash: pinHash,
+        created_at: authData.user.created_at,
+        updated_at: authData.user.updated_at,
+      };
+
+      dbStore.users.set(createdUser.id, createdUser);
+      dbStore.usersByMobile.set(cleanMobile, createdUser.id);
+
+      // Create default profile in Supabase profiles table
+      try {
+        await supabaseAdmin.from('profiles').upsert(
+          {
+            user_id: createdUser.id,
+            city: 'Mumbai',
+            preferred_fit: 'Regular',
+            favorite_colors: ['Navy Blue', 'White', 'Olive Green', 'Charcoal Grey'],
+            avoided_colors: ['Neon Green', 'Bright Orange'],
+            style_preferences: ['Smart Casual', 'Minimal', 'Modern Indian'],
+            comfort_preference: 'Balanced',
+          },
+          { onConflict: 'user_id' }
+        );
+      } catch (pErr) {
+        console.warn('Supabase profile creation note:', pErr);
+      }
+
+      // Sync with public.users table if it exists
+      try {
+        await supabaseAdmin.from('users').upsert(
+          {
+            id: createdUser.id,
+            name: createdUser.name,
+            mobile_number: createdUser.mobile_number,
+            pin_hash: pinHash,
+          },
+          { onConflict: 'mobile_number' }
+        );
+      } catch (uErr) {
+        // Ignored if table not created
+      }
+
+      // Seed starter wardrobe pieces for instant styling readiness
+      try {
+        await this.seedDefaultWardrobe(createdUser.id);
+      } catch (sErr) {
+        console.warn('Initial wardrobe seeding note:', sErr);
+      }
+
+      return createdUser;
+    }
+
+    // Local fallback store
+    const userId = generateId();
     const newUser: User = {
       id: userId,
-      name,
-      mobile_number: mobileNumber,
+      name: name.trim(),
+      mobile_number: cleanMobile,
       pin_hash: pinHash,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
     dbStore.users.set(newUser.id, newUser);
-    dbStore.usersByMobile.set(mobileNumber, newUser.id);
+    dbStore.usersByMobile.set(cleanMobile, newUser.id);
 
-    // Create default profile
+    // Default profile
     const defaultProfile: UserProfile = {
       id: generateId(),
       user_id: newUser.id,
@@ -157,7 +340,7 @@ export const Repository = {
       weight: '72 kg',
       skin_tone: 'Warm Olive',
       preferred_fit: 'Regular',
-      favorite_colors: ['Navy Blue', 'White', 'Olive Green', 'Charcoal', 'Beige'],
+      favorite_colors: ['Navy Blue', 'White', 'Olive Green', 'Charcoal Grey', 'Beige'],
       avoided_colors: ['Neon Green', 'Bright Orange'],
       style_preferences: ['Smart Casual', 'Minimal', 'Modern Indian'],
       comfort_preference: 'Balanced',
@@ -165,10 +348,19 @@ export const Repository = {
     };
     dbStore.profiles.set(newUser.id, defaultProfile);
 
+    // Seed starter wardrobe
+    await this.seedDefaultWardrobe(newUser.id);
+
     return newUser;
   },
 
+  // ============================================================================
+  // USER PROFILES
+  // ============================================================================
+
   async getUserProfile(userId: string): Promise<UserProfile | null> {
+    if (!userId) return null;
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
         const { data, error } = await supabaseAdmin
@@ -176,13 +368,37 @@ export const Repository = {
           .select('*')
           .eq('user_id', userId)
           .maybeSingle();
-        if (!error && data) return data as UserProfile;
+
+        if (!error && data) {
+          const prof = data as UserProfile;
+          dbStore.profiles.set(userId, prof);
+          return prof;
+        }
       } catch (err) {
-        console.warn('Supabase getUserProfile error:', err);
+        console.warn('Supabase getUserProfile note:', err);
       }
     }
 
-    return dbStore.profiles.get(userId) || null;
+    const cached = dbStore.profiles.get(userId);
+    if (cached) return cached;
+
+    // Return sensible default profile
+    const defaultProfile: UserProfile = {
+      id: generateId(),
+      user_id: userId,
+      city: 'Mumbai',
+      height: "5'10\"",
+      weight: '72 kg',
+      skin_tone: 'Warm Olive',
+      preferred_fit: 'Regular',
+      favorite_colors: ['Navy Blue', 'White', 'Olive Green', 'Charcoal Grey', 'Beige'],
+      avoided_colors: ['Neon Green', 'Bright Orange'],
+      style_preferences: ['Smart Casual', 'Minimal', 'Modern Indian'],
+      comfort_preference: 'Balanced',
+      created_at: new Date().toISOString(),
+    };
+    dbStore.profiles.set(userId, defaultProfile);
+    return defaultProfile;
   },
 
   async upsertUserProfile(userId: string, profileData: Partial<UserProfile>): Promise<UserProfile> {
@@ -190,11 +406,11 @@ export const Repository = {
     const updated: UserProfile = {
       id: existing?.id || generateId(),
       user_id: userId,
-      height: profileData.height ?? existing?.height,
-      weight: profileData.weight ?? existing?.weight,
-      skin_tone: profileData.skin_tone ?? existing?.skin_tone,
+      height: profileData.height ?? existing?.height ?? "5'10\"",
+      weight: profileData.weight ?? existing?.weight ?? '72 kg',
+      skin_tone: profileData.skin_tone ?? existing?.skin_tone ?? 'Warm Olive',
       preferred_fit: profileData.preferred_fit ?? existing?.preferred_fit ?? 'Regular',
-      favorite_colors: profileData.favorite_colors ?? existing?.favorite_colors ?? ['Navy Blue', 'White', 'Charcoal'],
+      favorite_colors: profileData.favorite_colors ?? existing?.favorite_colors ?? ['Navy Blue', 'White', 'Charcoal Grey'],
       avoided_colors: profileData.avoided_colors ?? existing?.avoided_colors ?? [],
       style_preferences: profileData.style_preferences ?? existing?.style_preferences ?? ['Smart Casual', 'Minimal'],
       comfort_preference: profileData.comfort_preference ?? existing?.comfort_preference ?? 'Balanced',
@@ -217,9 +433,14 @@ export const Repository = {
           )
           .select('*')
           .single();
-        if (!error && data) return data as UserProfile;
+
+        if (!error && data) {
+          const saved = data as UserProfile;
+          dbStore.profiles.set(userId, saved);
+          return saved;
+        }
       } catch (err) {
-        console.warn('Supabase upsertUserProfile error:', err);
+        console.warn('Supabase upsertUserProfile note:', err);
       }
     }
 
@@ -228,7 +449,7 @@ export const Repository = {
   },
 
   // ============================================================================
-  // WARDROBE ITEMS (STRICT USER ISOLATION)
+  // WARDROBE ITEMS (STRICT USER ISOLATION BY USER_ID)
   // ============================================================================
 
   async getWardrobeItems(
@@ -240,6 +461,8 @@ export const Repository = {
       searchQuery?: string;
     }
   ): Promise<WardrobeItem[]> {
+    if (!userId) return [];
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
         let query = supabaseAdmin
@@ -270,10 +493,11 @@ export const Repository = {
                 it.subcategory.toLowerCase().includes(q)
             );
           }
+          dbStore.wardrobe.set(userId, items);
           return items;
         }
       } catch (err) {
-        console.warn('Supabase getWardrobeItems error:', err);
+        console.warn('Supabase getWardrobeItems note:', err);
       }
     }
 
@@ -303,6 +527,8 @@ export const Repository = {
   },
 
   async getWardrobeItemById(userId: string, itemId: string): Promise<WardrobeItem | null> {
+    if (!userId || !itemId) return null;
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
         const { data, error } = await supabaseAdmin
@@ -311,9 +537,10 @@ export const Repository = {
           .eq('user_id', userId)
           .eq('id', itemId)
           .maybeSingle();
+
         if (!error && data) return data as WardrobeItem;
       } catch (err) {
-        console.warn('Supabase getWardrobeItemById error:', err);
+        console.warn('Supabase getWardrobeItemById note:', err);
       }
     }
 
@@ -321,7 +548,10 @@ export const Repository = {
     return items.find((it) => it.id === itemId) || null;
   },
 
-  async addWardrobeItem(userId: string, item: Omit<WardrobeItem, 'id' | 'user_id' | 'created_at' | 'times_worn'>): Promise<WardrobeItem> {
+  async addWardrobeItem(
+    userId: string,
+    item: Omit<WardrobeItem, 'id' | 'user_id' | 'created_at' | 'times_worn'>
+  ): Promise<WardrobeItem> {
     const newItem: WardrobeItem = {
       id: generateId(),
       user_id: userId,
@@ -349,15 +579,22 @@ export const Repository = {
             style: item.style,
             formality: item.formality,
             season: item.season || [],
-            is_favorite: item.is_favorite || false,
-            is_archived: item.is_archived || false,
+            is_favorite: Boolean(item.is_favorite),
+            is_archived: Boolean(item.is_archived),
             times_worn: 0,
           })
           .select('*')
           .single();
-        if (!error && data) return data as WardrobeItem;
+
+        if (!error && data) {
+          const created = data as WardrobeItem;
+          const items = dbStore.wardrobe.get(userId) || [];
+          items.unshift(created);
+          dbStore.wardrobe.set(userId, items);
+          return created;
+        }
       } catch (err) {
-        console.warn('Supabase addWardrobeItem error:', err);
+        console.warn('Supabase addWardrobeItem note:', err);
       }
     }
 
@@ -372,6 +609,8 @@ export const Repository = {
     itemId: string,
     updates: Partial<WardrobeItem>
   ): Promise<WardrobeItem | null> {
+    if (!userId || !itemId) return null;
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
         const { data, error } = await supabaseAdmin
@@ -384,9 +623,16 @@ export const Repository = {
           .eq('id', itemId)
           .select('*')
           .single();
-        if (!error && data) return data as WardrobeItem;
+
+        if (!error && data) {
+          const updated = data as WardrobeItem;
+          const items = dbStore.wardrobe.get(userId) || [];
+          const idx = items.findIndex((i) => i.id === itemId);
+          if (idx !== -1) items[idx] = updated;
+          return updated;
+        }
       } catch (err) {
-        console.warn('Supabase updateWardrobeItem error:', err);
+        console.warn('Supabase updateWardrobeItem note:', err);
       }
     }
 
@@ -404,6 +650,8 @@ export const Repository = {
   },
 
   async deleteWardrobeItem(userId: string, itemId: string): Promise<boolean> {
+    if (!userId || !itemId) return false;
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
         const { error } = await supabaseAdmin
@@ -411,9 +659,14 @@ export const Repository = {
           .delete()
           .eq('user_id', userId)
           .eq('id', itemId);
-        if (!error) return true;
+
+        if (!error) {
+          const items = dbStore.wardrobe.get(userId) || [];
+          dbStore.wardrobe.set(userId, items.filter((it) => it.id !== itemId));
+          return true;
+        }
       } catch (err) {
-        console.warn('Supabase deleteWardrobeItem error:', err);
+        console.warn('Supabase deleteWardrobeItem note:', err);
       }
     }
 
@@ -434,6 +687,7 @@ export const Repository = {
   },
 
   async seedDefaultWardrobe(userId: string): Promise<WardrobeItem[]> {
+    if (!userId) return [];
     const existing = await this.getWardrobeItems(userId, { includeArchived: true });
     if (existing.length > 0) return existing;
 
@@ -462,12 +716,15 @@ export const Repository = {
   },
 
   async resetUserWardrobe(userId: string): Promise<void> {
+    if (!userId) return;
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
         await supabaseAdmin.from('wardrobe_items').delete().eq('user_id', userId);
         await supabaseAdmin.from('outfits').delete().eq('user_id', userId);
+        await supabaseAdmin.from('outfit_feedback').delete().eq('user_id', userId);
       } catch (err) {
-        console.warn('Supabase resetUserWardrobe error:', err);
+        console.warn('Supabase resetUserWardrobe note:', err);
       }
     }
     dbStore.wardrobe.set(userId, []);
@@ -476,7 +733,7 @@ export const Repository = {
   },
 
   // ============================================================================
-  // OUTFITS & RECOMMENDATIONS
+  // OUTFITS & RECOMMENDATIONS (STRICT USER ISOLATION)
   // ============================================================================
 
   async saveOutfit(userId: string, outfitData: Omit<Outfit, 'id' | 'user_id' | 'created_at'>): Promise<Outfit> {
@@ -507,22 +764,30 @@ export const Repository = {
           .single();
 
         if (!error && createdOutfit) {
-          // Insert items
+          // Insert junction items if table exists
           for (const itemRef of outfitData.items) {
-            await supabaseAdmin.from('outfit_items').insert({
-              outfit_id: createdOutfit.id,
-              wardrobe_item_id: itemRef.wardrobe_item_id,
-              role: itemRef.role,
-            });
+            try {
+              await supabaseAdmin.from('outfit_items').insert({
+                outfit_id: createdOutfit.id,
+                wardrobe_item_id: itemRef.wardrobe_item_id,
+                role: itemRef.role,
+              });
+            } catch {
+              // Ignore junction error if table not yet migrated
+            }
           }
-          return {
+          const fullOutfit: Outfit = {
             ...createdOutfit,
             items: outfitData.items,
             alternative_looks: outfitData.alternative_looks,
-          } as Outfit;
+          };
+          const list = dbStore.outfits.get(userId) || [];
+          list.unshift(fullOutfit);
+          dbStore.outfits.set(userId, list);
+          return fullOutfit;
         }
       } catch (err) {
-        console.warn('Supabase saveOutfit error:', err);
+        console.warn('Supabase saveOutfit note:', err);
       }
     }
 
@@ -533,6 +798,8 @@ export const Repository = {
   },
 
   async getUserOutfits(userId: string): Promise<Outfit[]> {
+    if (!userId) return [];
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
         const { data: outfitRows, error } = await supabaseAdmin
@@ -548,7 +815,7 @@ export const Repository = {
           .eq('user_id', userId)
           .order('created_at', { ascending: false });
 
-        if (!error && outfitRows) {
+        if (!error && outfitRows && outfitRows.length > 0) {
           return outfitRows.map((row: any) => ({
             id: row.id,
             user_id: row.user_id,
@@ -570,12 +837,12 @@ export const Repository = {
           }));
         }
       } catch (err) {
-        console.warn('Supabase getUserOutfits error:', err);
+        console.warn('Supabase getUserOutfits note:', err);
       }
     }
 
     const outfits = dbStore.outfits.get(userId) || [];
-    const wardrobe = dbStore.wardrobe.get(userId) || [];
+    const wardrobe = await this.getWardrobeItems(userId, { includeArchived: true });
     const wardrobeMap = new Map(wardrobe.map((i) => [i.id, i]));
 
     return outfits.map((o) => ({
@@ -588,12 +855,13 @@ export const Repository = {
   },
 
   async deleteOutfit(userId: string, outfitId: string): Promise<boolean> {
+    if (!userId || !outfitId) return false;
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
         await supabaseAdmin.from('outfits').delete().eq('user_id', userId).eq('id', outfitId);
-        return true;
       } catch (err) {
-        console.warn('Supabase deleteOutfit error:', err);
+        console.warn('Supabase deleteOutfit note:', err);
       }
     }
 
@@ -627,9 +895,10 @@ export const Repository = {
           })
           .select('*')
           .single();
+
         if (!error && data) return data as OutfitFeedback;
       } catch (err) {
-        console.warn('Supabase recordFeedback error:', err);
+        console.warn('Supabase recordFeedback note:', err);
       }
     }
 
@@ -655,7 +924,7 @@ export const Repository = {
     const favorites = activeItems.filter((i) => i.is_favorite).length;
     const archived = allItems.filter((i) => i.is_archived).length;
 
-    // Color distribution
+    // Dominant color distribution
     const colorCount: { [color: string]: number } = {};
     activeItems.forEach((it) => {
       const col = it.primary_color;

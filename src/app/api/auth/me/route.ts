@@ -7,23 +7,26 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const session = await getSessionUser();
-    if (!session) {
+    if (!session || !session.userId) {
       return NextResponse.json({ authenticated: false, user: null }, { status: 401 });
     }
 
     const user = await Repository.findUserById(session.userId);
-    if (!user) {
-      return NextResponse.json({ authenticated: false, user: null }, { status: 401 });
-    }
+    const resolvedUser = user || {
+      id: session.userId,
+      name: session.name || 'Gentleman',
+      mobile_number: session.mobile || '',
+      created_at: new Date().toISOString(),
+    };
 
-    const profile = await Repository.getUserProfile(user.id);
+    const profile = await Repository.getUserProfile(resolvedUser.id);
 
     return NextResponse.json({
       authenticated: true,
       user: {
-        id: user.id,
-        name: user.name,
-        mobile_number: user.mobile_number,
+        id: resolvedUser.id,
+        name: resolvedUser.name,
+        mobile_number: resolvedUser.mobile_number,
       },
       profile,
     });

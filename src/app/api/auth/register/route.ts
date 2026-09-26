@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { hashPin, isValidPinFormat, normalizeMobileNumber } from '@/lib/auth/pin';
+import { isValidPinFormat, normalizeMobileNumber } from '@/lib/auth/pin';
 import { createSessionToken, setSessionCookie } from '@/lib/auth/session';
 import { Repository } from '@/lib/db/repository';
 
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
     const cleanMobile = normalizeMobileNumber(mobile_number || '');
     if (!cleanMobile || cleanMobile.length !== 10) {
-      return NextResponse.json({ error: 'Please enter a valid 10-digit Indian mobile number.' }, { status: 400 });
+      return NextResponse.json({ error: 'Please enter a valid 10-digit mobile number.' }, { status: 400 });
     }
 
     if (!pin || !isValidPinFormat(pin)) {
@@ -24,14 +24,14 @@ export async function POST(req: NextRequest) {
     // Check if user already exists
     const existingUser = await Repository.findUserByMobile(cleanMobile);
     if (existingUser) {
-      return NextResponse.json({ error: 'An account with this mobile number already exists. Please log in with your PIN.' }, { status: 409 });
+      return NextResponse.json(
+        { error: 'An account with this mobile number already exists.' },
+        { status: 409 }
+      );
     }
 
-    // Hash the 6-digit PIN securely
-    const pinHash = await hashPin(pin);
-
-    // Create user in isolated storage/database
-    const newUser = await Repository.createUser(name.trim(), cleanMobile, pinHash);
+    // Create user securely in Supabase Auth & database
+    const newUser = await Repository.createUser(name.trim(), cleanMobile, pin);
 
     // Generate JWT session token
     const token = await createSessionToken(newUser);
@@ -47,6 +47,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Registration error:', error);
-    return NextResponse.json({ error: 'Unable to complete registration. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
   }
 }

@@ -11,7 +11,12 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey || supabaseServiceKey)
   : null;
 
-// Admin/Server-side client with elevated permissions for RLS backend operations
+// Admin/Server-side client with elevated permissions for backend operations
 export const supabaseAdmin = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
   : null;

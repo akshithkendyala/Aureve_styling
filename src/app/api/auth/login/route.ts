@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyPin, isValidPinFormat, normalizeMobileNumber } from '@/lib/auth/pin';
+import { isValidPinFormat, normalizeMobileNumber } from '@/lib/auth/pin';
 import {
   createSessionToken,
   setSessionCookie,
@@ -34,9 +34,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Lookup user
+    // Lookup user in Supabase
     const user = await Repository.findUserByMobile(cleanMobile);
-    if (!user || !user.pin_hash) {
+    if (!user) {
       recordFailedAttempt(cleanMobile);
       return NextResponse.json(
         { error: 'No account found with this mobile number. Please register your account.' },
@@ -44,30 +44,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify PIN with bcrypt
-    const isPinValid = await verifyPin(pin, user.pin_hash);
-    if (!isPinValid) {
+    // Verify PIN / credentials against Supabase Auth
+    const authResult = await Repository.verifyCredentials(cleanMobile, pin);
+    if (!authResult.success || !authResult.user) {
       recordFailedAttempt(cleanMobile);
-      return NextResponse.json({ error: 'Incorrect 6-digit PIN. Please try again.' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Invalid mobile number or PIN.' },
+        { status: 401 }
+      );
     }
+
+    const authenticatedUser = authResult.user;
 
     // Success: Clear failed attempts
     clearFailedAttempts(cleanMobile);
 
-    // Create session token and set secure cookie
-    const token = await createSessionToken(user);
+    // Create session token and set secure HTTP-only cookie
+    const token = await createSessionToken(authenticatedUser);
     await setSessionCookie(token);
 
     return NextResponse.json({
       success: true,
       user: {
-        id: user.id,
-        name: user.name,
-        mobile_number: user.mobile_number,
+        id: authenticatedUser.id,
+        name: authenticatedUser.name,
+        mobile_number: authenticatedUser.mobile_number,
       },
     });
   } catch (error: any) {
     console.error('Login error:', error);
-    return NextResponse.json({ error: 'Authentication failed. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
   }
 }
