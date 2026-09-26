@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { AddClothingModal } from '@/components/wardrobe/AddClothingModal';
@@ -13,10 +13,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
   const [user, setUser] = useState<{ id: string; name: string; mobile_number: string } | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
-  const [weather, setWeather] = useState<{ temp?: number; city?: string }>({});
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
@@ -32,22 +29,14 @@ export default function DashboardLayout({
         }
         const data = await res.json();
         if (data.authenticated && data.user) {
-          if (isMounted) {
-            setUser(data.user);
-            setProfile(data.profile);
+          // If profile is incomplete, redirect to onboarding
+          if (data.profile && data.profile.profile_completed === false) {
+            if (isMounted) router.push('/onboarding');
+            return;
           }
 
-          // Load weather for user's city
-          const city = data.profile?.city || 'Mumbai';
-          const weatherRes = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
-          if (weatherRes.ok && isMounted) {
-            const wData = await weatherRes.json();
-            if (wData.weather) {
-              setWeather({
-                temp: wData.weather.temperature,
-                city: wData.weather.city,
-              });
-            }
+          if (isMounted) {
+            setUser(data.user);
           }
         } else {
           if (isMounted) router.push('/login');
@@ -88,8 +77,6 @@ export default function DashboardLayout({
       {/* Top Header */}
       <Header
         user={user}
-        weatherTemp={weather.temp}
-        weatherCity={weather.city}
         onOpenAddModal={() => setIsAddModalOpen(true)}
       />
 

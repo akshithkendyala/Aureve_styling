@@ -44,6 +44,8 @@ export async function POST(req: NextRequest) {
         name: newUser.name,
         mobile_number: newUser.mobile_number,
       },
+      profile_completed: false,
+      redirectTo: '/onboarding',
     });
   } catch (error: any) {
     console.error('Registration error:', error);

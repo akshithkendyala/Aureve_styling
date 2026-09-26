@@ -63,6 +63,10 @@ export async function POST(req: NextRequest) {
     const token = await createSessionToken(authenticatedUser);
     await setSessionCookie(token);
 
+    // Check profile completion status
+    const profile = await Repository.getUserProfile(authenticatedUser.id);
+    const isProfileCompleted = Boolean(profile?.profile_completed);
+
     return NextResponse.json({
       success: true,
       user: {
@@ -70,6 +74,8 @@ export async function POST(req: NextRequest) {
         name: authenticatedUser.name,
         mobile_number: authenticatedUser.mobile_number,
       },
+      profile_completed: isProfileCompleted,
+      redirectTo: isProfileCompleted ? '/dashboard' : '/onboarding',
     });
   } catch (error: any) {
     console.error('Login error:', error);

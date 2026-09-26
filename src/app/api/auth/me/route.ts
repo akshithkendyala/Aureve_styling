@@ -29,6 +29,7 @@ export async function GET() {
         mobile_number: resolvedUser.mobile_number,
       },
       profile,
+      profile_completed: Boolean(profile?.profile_completed),
     });
   } catch (error) {
     console.error('Session verify error:', error);

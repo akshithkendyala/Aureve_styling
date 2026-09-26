@@ -46,7 +46,9 @@ export interface UserProfile {
   avoided_colors: string[];
   style_preferences: string[]; // e.g. ["Minimal", "Smart Casual", "Modern Indian"]
   comfort_preference?: 'Maximum Comfort' | 'Balanced' | 'Structure & Sharpness';
+  typical_occasions?: string[]; // e.g. ["Office", "Casual outings", "Dates", "Weddings / functions"]
   city?: string;
+  profile_completed?: boolean;
   created_at: string;
   updated_at?: string;
 }

@@ -285,6 +285,8 @@ export const Repository = {
             avoided_colors: ['Neon Green', 'Bright Orange'],
             style_preferences: ['Smart Casual', 'Minimal', 'Modern Indian'],
             comfort_preference: 'Balanced',
+            typical_occasions: ['Office', 'Casual outings', 'Dates'],
+            profile_completed: false,
           },
           { onConflict: 'user_id' }
         );
@@ -344,6 +346,8 @@ export const Repository = {
       avoided_colors: ['Neon Green', 'Bright Orange'],
       style_preferences: ['Smart Casual', 'Minimal', 'Modern Indian'],
       comfort_preference: 'Balanced',
+      typical_occasions: ['Office', 'Casual outings', 'Dates'],
+      profile_completed: false,
       created_at: new Date().toISOString(),
     };
     dbStore.profiles.set(newUser.id, defaultProfile);
@@ -370,7 +374,10 @@ export const Repository = {
           .maybeSingle();
 
         if (!error && data) {
-          const prof = data as UserProfile;
+          const prof: UserProfile = {
+            ...(data as UserProfile),
+            profile_completed: Boolean(data.profile_completed),
+          };
           dbStore.profiles.set(userId, prof);
           return prof;
         }
@@ -395,6 +402,8 @@ export const Repository = {
       avoided_colors: ['Neon Green', 'Bright Orange'],
       style_preferences: ['Smart Casual', 'Minimal', 'Modern Indian'],
       comfort_preference: 'Balanced',
+      typical_occasions: ['Office', 'Casual outings', 'Dates'],
+      profile_completed: false,
       created_at: new Date().toISOString(),
     };
     dbStore.profiles.set(userId, defaultProfile);
@@ -414,7 +423,9 @@ export const Repository = {
       avoided_colors: profileData.avoided_colors ?? existing?.avoided_colors ?? [],
       style_preferences: profileData.style_preferences ?? existing?.style_preferences ?? ['Smart Casual', 'Minimal'],
       comfort_preference: profileData.comfort_preference ?? existing?.comfort_preference ?? 'Balanced',
+      typical_occasions: profileData.typical_occasions ?? existing?.typical_occasions ?? ['Office', 'Casual outings', 'Dates'],
       city: profileData.city ?? existing?.city ?? 'Mumbai',
+      profile_completed: profileData.profile_completed !== undefined ? profileData.profile_completed : (existing?.profile_completed ?? false),
       created_at: existing?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -426,7 +437,17 @@ export const Repository = {
           .upsert(
             {
               user_id: userId,
-              ...profileData,
+              height: updated.height,
+              weight: updated.weight,
+              skin_tone: updated.skin_tone,
+              preferred_fit: updated.preferred_fit,
+              favorite_colors: updated.favorite_colors,
+              avoided_colors: updated.avoided_colors,
+              style_preferences: updated.style_preferences,
+              comfort_preference: updated.comfort_preference,
+              typical_occasions: updated.typical_occasions,
+              city: updated.city,
+              profile_completed: updated.profile_completed,
               updated_at: new Date().toISOString(),
             },
             { onConflict: 'user_id' }
@@ -435,7 +456,10 @@ export const Repository = {
           .single();
 
         if (!error && data) {
-          const saved = data as UserProfile;
+          const saved: UserProfile = {
+            ...(data as UserProfile),
+            profile_completed: Boolean(data.profile_completed),
+          };
           dbStore.profiles.set(userId, saved);
           return saved;
         }

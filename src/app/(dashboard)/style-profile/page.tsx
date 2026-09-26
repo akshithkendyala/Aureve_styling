@@ -122,6 +122,7 @@ export default function StyleProfilePage() {
           style_preferences: stylePrefs,
           comfort_preference: comfortPreference,
           city,
+          profile_completed: true,
         }),
       });
 

@@ -31,7 +31,9 @@ create table if not exists public.profiles (
     avoided_colors jsonb default '[]'::jsonb,
     style_preferences jsonb default '[]'::jsonb,
     comfort_preference text,
+    typical_occasions jsonb default '[]'::jsonb,
     city text default 'Mumbai',
+    profile_completed boolean default false,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null,
     updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );

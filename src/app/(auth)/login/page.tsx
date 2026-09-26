@@ -55,8 +55,9 @@ export default function LoginPage() {
         return;
       }
 
-      // Success -> Redirect to dashboard
-      window.location.href = '/dashboard';
+      // Success -> Redirect based on onboarding status
+      const target = data.redirectTo || (data.profile_completed ? '/dashboard' : '/onboarding');
+      window.location.href = target;
     } catch (err) {
       console.error(err);
       setError('A network error occurred. Please try again.');
@@ -79,7 +80,9 @@ export default function LoginPage() {
       });
 
       if (loginRes.ok) {
-        window.location.href = '/dashboard';
+        const d = await loginRes.json();
+        const target = d.redirectTo || (d.profile_completed ? '/dashboard' : '/onboarding');
+        window.location.href = target;
         return;
       }
 
@@ -95,7 +98,9 @@ export default function LoginPage() {
       });
 
       if (regRes.ok) {
-        window.location.href = '/dashboard';
+        const d = await regRes.json();
+        const target = d.redirectTo || '/onboarding';
+        window.location.href = target;
       } else {
         const d = await regRes.json();
         setError(d.error || 'Demo login could not be initiated.');
