@@ -22,14 +22,26 @@ const POPULAR_COLORS = [
 ];
 
 const STYLE_PREFERENCES = [
-  'Smart Casual',
   'Minimal',
-  'Modern Indian',
   'Casual',
+  'Smart Casual',
   'Formal',
   'Streetwear',
   'Sporty',
-  'Festive / Traditional',
+  'Traditional',
+  'Modern Indian',
+];
+
+const POPULAR_OCCASIONS = [
+  'College',
+  'Office',
+  'Casual outings',
+  'Dates',
+  'Parties',
+  'Weddings / functions',
+  'Travel',
+  'Sports / fitness',
+  'Home',
 ];
 
 export default function StyleProfilePage() {
@@ -42,6 +54,7 @@ export default function StyleProfilePage() {
   const [avoidedColors, setAvoidedColors] = useState<string[]>(['Neon Green', 'Bright Orange']);
   const [stylePrefs, setStylePrefs] = useState<string[]>(['Smart Casual', 'Minimal', 'Modern Indian']);
   const [comfortPreference, setComfortPreference] = useState<'Maximum Comfort' | 'Balanced' | 'Structure & Sharpness'>('Balanced');
+  const [typicalOccasions, setTypicalOccasions] = useState<string[]>(['Office', 'Casual outings', 'Dates']);
   const [city, setCity] = useState('Mumbai');
 
   const [isLoading, setIsLoading] = useState(true);
@@ -61,10 +74,11 @@ export default function StyleProfilePage() {
             if (p.weight) setWeight(p.weight);
             if (p.skin_tone) setSkinTone(p.skin_tone);
             if (p.preferred_fit) setPreferredFit(p.preferred_fit);
-            if (p.favorite_colors) setFavoriteColors(p.favorite_colors);
-            if (p.avoided_colors) setAvoidedColors(p.avoided_colors);
-            if (p.style_preferences) setStylePrefs(p.style_preferences);
+            if (p.favorite_colors && Array.isArray(p.favorite_colors)) setFavoriteColors(p.favorite_colors);
+            if (p.avoided_colors && Array.isArray(p.avoided_colors)) setAvoidedColors(p.avoided_colors);
+            if (p.style_preferences && Array.isArray(p.style_preferences)) setStylePrefs(p.style_preferences);
             if (p.comfort_preference) setComfortPreference(p.comfort_preference);
+            if (p.typical_occasions && Array.isArray(p.typical_occasions)) setTypicalOccasions(p.typical_occasions);
             if (p.city) setCity(p.city);
           }
         }
@@ -103,6 +117,14 @@ export default function StyleProfilePage() {
     }
   };
 
+  const toggleOccasion = (occ: string) => {
+    if (typicalOccasions.includes(occ)) {
+      setTypicalOccasions(typicalOccasions.filter((item) => item !== occ));
+    } else {
+      setTypicalOccasions([...typicalOccasions, occ]);
+    }
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -121,6 +143,7 @@ export default function StyleProfilePage() {
           avoided_colors: avoidedColors,
           style_preferences: stylePrefs,
           comfort_preference: comfortPreference,
+          typical_occasions: typicalOccasions,
           city,
           profile_completed: true,
         }),
@@ -365,6 +388,41 @@ export default function StyleProfilePage() {
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Typical Occasions */}
+        <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-5">
+          <div className="flex items-center space-x-2 pb-3 border-b border-[#F4EFEA]">
+            <Sparkles className="w-4 h-4 text-[#9A7B5F]" />
+            <h3 className="font-serif text-xl font-semibold text-[#18181B]">
+              Typical Occasions & Lifestyle
+            </h3>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
+              Frequent Settings (Prioritized for Outfit Recommendations)
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {POPULAR_OCCASIONS.map((occ) => {
+                const active = typicalOccasions.includes(occ);
+                return (
+                  <button
+                    key={occ}
+                    type="button"
+                    onClick={() => toggleOccasion(occ)}
+                    className={`px-3.5 py-2 rounded-2xl text-xs font-medium transition-all ${
+                      active
+                        ? 'bg-[#18181B] text-white shadow-xs'
+                        : 'bg-[#FAF8F5] border border-[#EBE5DB] text-[#5E4633] hover:bg-white'
+                    }`}
+                  >
+                    {occ}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

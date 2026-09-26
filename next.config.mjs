@@ -9,6 +9,22 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/my-wardrobe',
+        destination: '/wardrobe',
+      },
+      {
+        source: '/my-looks',
+        destination: '/looks',
+      },
+      {
+        source: '/my-style',
+        destination: '/style-profile',
+      },
+    ];
+  },
 };
 
 export default nextConfig;
