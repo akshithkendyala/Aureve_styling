@@ -311,13 +311,6 @@ export const Repository = {
         console.warn('Supabase profile creation note:', pErr);
       }
 
-      // Seed starter wardrobe pieces for instant styling readiness
-      try {
-        await this.seedDefaultWardrobe(createdUser.id);
-      } catch (sErr) {
-        console.warn('Initial wardrobe seeding note:', sErr);
-      }
-
       return createdUser;
     }
 
@@ -353,9 +346,6 @@ export const Repository = {
       created_at: new Date().toISOString(),
     };
     dbStore.profiles.set(newUser.id, defaultProfile);
-
-    // Seed starter wardrobe
-    await this.seedDefaultWardrobe(newUser.id);
 
     return newUser;
   },
