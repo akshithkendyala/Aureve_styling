@@ -620,6 +620,61 @@ export const Repository = {
     return newItem;
   },
 
+  async addWardrobeItemsBatch(
+    userId: string,
+    itemsList: Omit<WardrobeItem, 'id' | 'user_id' | 'created_at' | 'times_worn'>[]
+  ): Promise<WardrobeItem[]> {
+    if (!itemsList || itemsList.length === 0) return [];
+
+    const now = new Date().toISOString();
+    const rowsToInsert = itemsList.map((item) => ({
+      user_id: userId,
+      image_url: item.image_url,
+      name: item.name,
+      category: item.category,
+      subcategory: item.subcategory,
+      primary_color: item.primary_color,
+      secondary_colors: item.secondary_colors || [],
+      pattern: item.pattern || 'Solid',
+      material: item.material || 'Cotton',
+      fit: item.fit || 'Regular',
+      style: item.style || 'Smart Casual',
+      formality: item.formality || 'Smart Casual',
+      season: item.season || ['All-Season'],
+      is_favorite: Boolean(item.is_favorite),
+      is_archived: Boolean(item.is_archived),
+      times_worn: 0,
+    }));
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('wardrobe_items')
+          .insert(rowsToInsert)
+          .select('*');
+
+        if (!error && data) {
+          const createdItems = data as WardrobeItem[];
+          const current = dbStore.wardrobe.get(userId) || [];
+          dbStore.wardrobe.set(userId, [...createdItems, ...current]);
+          return createdItems;
+        }
+      } catch (err) {
+        console.warn('Supabase addWardrobeItemsBatch error:', err);
+      }
+    }
+
+    const createdFallback: WardrobeItem[] = rowsToInsert.map((row) => ({
+      ...row,
+      id: generateId(),
+      created_at: now,
+      updated_at: now,
+    }));
+    const current = dbStore.wardrobe.get(userId) || [];
+    dbStore.wardrobe.set(userId, [...createdFallback, ...current]);
+    return createdFallback;
+  },
+
   async updateWardrobeItem(
     userId: string,
     itemId: string,

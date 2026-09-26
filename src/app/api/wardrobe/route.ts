@@ -38,6 +38,24 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+
+    // Check if batch upload
+    if (Array.isArray(body.items) && body.items.length > 0) {
+      const validItems = body.items.filter(
+        (i: any) => i.name && i.category && i.image_url && i.primary_color
+      );
+
+      if (validItems.length === 0) {
+        return NextResponse.json(
+          { error: 'No valid items with required fields found.' },
+          { status: 400 }
+        );
+      }
+
+      const createdItems = await Repository.addWardrobeItemsBatch(session.userId, validItems);
+      return NextResponse.json({ success: true, items: createdItems, count: createdItems.length });
+    }
+
     const {
       name,
       category,

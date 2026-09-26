@@ -93,6 +93,11 @@ export default function DashboardLayout({
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onItemAdded={handleItemAdded}
+        onItemsAdded={(items) => {
+          items.forEach((item) => {
+            window.dispatchEvent(new CustomEvent('aureve:item-added', { detail: item }));
+          });
+        }}
       />
     </div>
   );

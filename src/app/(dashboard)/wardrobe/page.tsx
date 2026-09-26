@@ -180,7 +180,10 @@ export default function WardrobePage() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onItemAdded={(newItem) => {
-          setItems([newItem, ...items]);
+          setItems((prev) => [newItem, ...prev.filter((i) => i.id !== newItem.id)]);
+        }}
+        onItemsAdded={(newItems) => {
+          setItems((prev) => [...newItems, ...prev.filter((i) => !newItems.some((n) => n.id === i.id))]);
         }}
       />
 
