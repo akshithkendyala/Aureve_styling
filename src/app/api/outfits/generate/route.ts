@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     // Fetch real-time weather for the designated location
     const weather = await fetchWeatherData(location || profile?.city || 'Mumbai');
 
-    // Run AI Occasion Intelligence & Styling Engine
+    // Run AI Occasion Intelligence & Styling Engine with continuous feedback learning
     const outfitResult = await generateIntelligentOutfit({
       userId: session.userId,
       userProfile: profile,
@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
       location: location || profile?.city || 'Mumbai',
       weather,
       previousOutfits,
+      userFeedback,
       specialMode,
     });
 

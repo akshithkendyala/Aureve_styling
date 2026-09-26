@@ -133,11 +133,60 @@ export interface OutfitFeedback {
   id: string;
   user_id: string;
   outfit_id: string;
-  rating: 'Loved it' | 'Good' | 'Average' | "Didn't like it";
-  feedback_tags: string[]; // e.g. ["Very comfortable", "Loved the colors", "Too formal"]
+  rating: 'Loved it' | 'Good' | 'Average' | "Didn't like it" | number;
+  feedback_tags: string[]; // e.g. ["Very comfortable", "Loved the colors", "Too formal", "Didn't like the fit"]
   comment?: string;
   created_at: string;
 }
+
+export interface PreferenceSignal {
+  attributeType: 'color' | 'fit' | 'style' | 'footwear' | 'formality' | 'pattern' | 'material' | 'garment_type';
+  attributeValue: string;
+  score: number; // -1.0 to +1.0
+  confidence: number; // 0.0 to 1.0
+  evidenceCount: number;
+  positiveCount: number;
+  negativeCount: number;
+  recencyWeightedScore: number;
+  signalStrength: 'weak' | 'emerging' | 'strong';
+  lastObservedAt: string;
+}
+
+export interface ItemPerformanceStats {
+  itemId: string;
+  timesRecommended: number;
+  timesWorn: number;
+  ratings: number[];
+  averageRating: number;
+  positiveCount: number;
+  negativeCount: number;
+  lastRatingAt: string;
+}
+
+export interface OccasionStylePreference {
+  occasion: string;
+  preferredFits: { [fit: string]: PreferenceSignal };
+  preferredFootwear: { [footwear: string]: PreferenceSignal };
+  preferredStyles: { [style: string]: PreferenceSignal };
+  preferredColors: { [color: string]: PreferenceSignal };
+}
+
+export interface LearnedStyleProfile {
+  userId: string;
+  totalFeedbacks: number;
+  averageRating: number;
+  itemStats: { [itemId: string]: ItemPerformanceStats };
+  colorPreferences: { [color: string]: PreferenceSignal };
+  fitPreferences: { [fit: string]: PreferenceSignal };
+  stylePreferences: { [style: string]: PreferenceSignal };
+  footwearPreferences: { [footwear: string]: PreferenceSignal };
+  patternPreferences: { [pattern: string]: PreferenceSignal };
+  formalityPreferences: { [formality: string]: PreferenceSignal };
+  occasionPreferences: { [occasion: string]: OccasionStylePreference };
+  combinationScores: { [fingerprint: string]: { score: number; evidence: number } };
+  stylistObservations: string[];
+}
+
 
 export interface AIClassificationResult {
   category: MainCategory;

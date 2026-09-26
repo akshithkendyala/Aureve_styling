@@ -7,9 +7,11 @@ import {
   OutfitFeedback,
   WardrobeStats,
   MainCategory,
+  LearnedStyleProfile,
 } from '@/lib/types';
 import { supabase, supabaseAdmin, isSupabaseConfigured } from './supabase';
 import { SAMPLE_INDIAN_WARDROBE } from '@/lib/ai/sampleWardrobe';
+import { buildLearnedStyleProfile } from '@/lib/ai/personalStyleEngine';
 import {
   normalizeMobileNumber,
   mobileToSupabaseEmail,
@@ -1048,6 +1050,16 @@ export const Repository = {
     }
 
     return dbStore.feedback.get(userId) || [];
+  },
+
+  async getLearnedStyleProfile(userId: string): Promise<LearnedStyleProfile> {
+    const [feedbacks, outfits, wardrobe] = await Promise.all([
+      this.getUserFeedback(userId),
+      this.getUserOutfits(userId),
+      this.getWardrobeItems(userId, { includeArchived: true }),
+    ]);
+
+    return buildLearnedStyleProfile(userId, feedbacks, outfits, wardrobe);
   },
 
   // ============================================================================

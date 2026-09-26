@@ -7,6 +7,8 @@ import {
   OutfitItemReference,
   AlternativeLook,
   MissingItemSuggestion,
+  OutfitFeedback,
+  LearnedStyleProfile,
 } from '@/lib/types';
 import {
   OCCASION_RULES,
@@ -14,6 +16,10 @@ import {
   getOccasionRule,
   normalizeSubcategory,
 } from '@/lib/ai/occasionRules';
+import {
+  buildLearnedStyleProfile,
+  calculateFeedbackScore,
+} from '@/lib/ai/personalStyleEngine';
 
 export interface GenerateOutfitParams {
   userId: string;
@@ -25,6 +31,7 @@ export interface GenerateOutfitParams {
   location?: string;
   weather?: WeatherData | null;
   previousOutfits?: Outfit[];
+  userFeedback?: OutfitFeedback[];
   specialMode?: 'standard' | 'quick' | 'comfort' | 'surprise' | 'travel';
 }
 
@@ -212,7 +219,8 @@ function generateRankedCandidates(
   weather: WeatherData | null | undefined,
   userProfile: UserProfile | null | undefined,
   previousOutfits: Outfit[],
-  specialMode: string
+  specialMode: string,
+  learnedProfile?: LearnedStyleProfile
 ): ScoredCombination[] {
   const recentFingerprints = new Set(
     previousOutfits.slice(0, 15).map((o) => {
@@ -295,7 +303,7 @@ function generateRankedCandidates(
           score -= 40;
         }
 
-        // User Profile preferences (+5 / -20)
+        // 5. User Profile static preferences (+5 / -20)
         if (userProfile?.favorite_colors) {
           if (userProfile.favorite_colors.some((fc) => top.primary_color.toLowerCase().includes(fc.toLowerCase()) || bottom.primary_color.toLowerCase().includes(fc.toLowerCase()))) {
             score += 4;
@@ -307,8 +315,20 @@ function generateRankedCandidates(
           }
         }
 
+        // 6. Dynamic Personal Style Learning & Feedback Score (+/- 35)
+        let personalReasons: string[] = [];
+        if (learnedProfile && learnedProfile.totalFeedbacks > 0) {
+          const fbResult = calculateFeedbackScore(
+            { top, bottom, footwear, layer, accessories: matchedAccessories },
+            rule.key,
+            learnedProfile
+          );
+          score += fbResult.score;
+          personalReasons = fbResult.reasons;
+        }
+
         const title = generateSmartTitle(rule.key, top, bottom);
-        const explanation = generateSmartExplanation(top, bottom, footwear, layer, rule, weather);
+        const explanation = generateSmartExplanation(top, bottom, footwear, layer, rule, weather, personalReasons);
 
         candidates.push({
           top,
@@ -363,7 +383,8 @@ function generateSmartExplanation(
   footwear: WardrobeItem | undefined,
   layer: WardrobeItem | undefined,
   rule: OccasionRule,
-  weather?: WeatherData | null
+  weather?: WeatherData | null,
+  personalReasons: string[] = []
 ): string {
   const topName = top.name;
   const bottomName = bottom.name;
@@ -372,20 +393,22 @@ function generateSmartExplanation(
   const weatherStr = weather
     ? ` In ${weather.city}'s ${weather.temperature}°C conditions, this selection balances breathability with sharp tailoring.`
     : '';
+  const personalStr =
+    personalReasons.length > 0 ? ` Reflecting your personal style preferences, this look ${personalReasons.join(' and ')}.` : '';
 
   if (rule.key === 'interview') {
-    return `For your interview, the ${topName} paired with ${bottomName}${footwearStr} creates a crisp, boardroom-ready presence with zero casual distractions.${weatherStr}`;
+    return `For your interview, the ${topName} paired with ${bottomName}${footwearStr} creates a crisp, boardroom-ready presence with zero casual distractions.${personalStr}${weatherStr}`;
   }
 
   if (rule.key === 'party') {
-    return `The ${topName} gives an intentional, modern evening vibe, paired with ${bottomName}${footwearStr} for a sleek and confident social look.${weatherStr}`;
+    return `The ${topName} gives an intentional, modern evening vibe, paired with ${bottomName}${footwearStr} for a sleek and confident social look.${personalStr}${weatherStr}`;
   }
 
   if (rule.key === 'wedding' || rule.key === 'festival') {
-    return `The ${topName} harmonizes seamlessly with ${bottomName}${footwearStr}, creating a sophisticated celebratory silhouette that respects festive traditions.${weatherStr}`;
+    return `The ${topName} harmonizes seamlessly with ${bottomName}${footwearStr}, creating a sophisticated celebratory silhouette that respects festive traditions.${personalStr}${weatherStr}`;
   }
 
-  return `The ${topName} provides a balanced focal point against ${bottomName}${layerStr}${footwearStr}, tailored appropriately for ${rule.name}.${weatherStr}`;
+  return `The ${topName} provides a balanced focal point against ${bottomName}${layerStr}${footwearStr}, tailored appropriately for ${rule.name}.${personalStr}${weatherStr}`;
 }
 
 /**
@@ -509,6 +532,7 @@ export async function generateIntelligentOutfit(
   params: GenerateOutfitParams
 ): Promise<Omit<Outfit, 'id' | 'user_id' | 'created_at'>> {
   const {
+    userId,
     wardrobe,
     userProfile,
     occasion,
@@ -517,6 +541,7 @@ export async function generateIntelligentOutfit(
     location = 'Mumbai',
     weather,
     previousOutfits = [],
+    userFeedback = [],
     specialMode = 'standard',
   } = params;
 
@@ -557,7 +582,10 @@ export async function generateIntelligentOutfit(
     throw new Error(`Your wardrobe does not contain appropriate clothing pieces for ${rule.name}. Please add appropriate pieces to your wardrobe.`);
   }
 
-  // Step 4: Generate Scored Deterministic Candidates
+  // Step 3.5: Build Dynamic Learned Personal Style Profile from Feedback History
+  const learnedProfile = buildLearnedStyleProfile(userId, userFeedback, previousOutfits, wardrobe);
+
+  // Step 4: Generate Scored Deterministic Candidates with Personal Learning Feedback
   const rankedCandidates = generateRankedCandidates(
     validTops,
     validBottoms,
@@ -568,7 +596,8 @@ export async function generateIntelligentOutfit(
     weather,
     userProfile,
     previousOutfits,
-    specialMode
+    specialMode,
+    learnedProfile
   );
 
   const topCandidate = rankedCandidates[0];
