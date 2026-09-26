@@ -18,11 +18,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Occasion is required to style an outfit.' }, { status: 400 });
     }
 
-    // Retrieve user profile and active wardrobe
-    const [profile, wardrobe, previousOutfits] = await Promise.all([
+    // Retrieve user profile, active wardrobe, previous outfits, and user feedback
+    const [profile, wardrobe, previousOutfits, userFeedback] = await Promise.all([
       Repository.getUserProfile(session.userId),
       Repository.getWardrobeItems(session.userId, { includeArchived: false }),
       Repository.getUserOutfits(session.userId),
+      Repository.getUserFeedback(session.userId),
     ]);
 
     if (!wardrobe || wardrobe.length === 0) {
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     // Fetch real-time weather for the designated location
     const weather = await fetchWeatherData(location || profile?.city || 'Mumbai');
 
-    // Run AI Styling Engine
+    // Run AI Occasion Intelligence & Styling Engine
     const outfitResult = await generateIntelligentOutfit({
       userId: session.userId,
       userProfile: profile,

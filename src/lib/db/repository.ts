@@ -979,6 +979,26 @@ export const Repository = {
     return newFeedback;
   },
 
+  async getUserFeedback(userId: string): Promise<OutfitFeedback[]> {
+    if (!userId) return [];
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('outfit_feedback')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (!error && data) return data as OutfitFeedback[];
+      } catch (err) {
+        console.warn('Supabase getUserFeedback note:', err);
+      }
+    }
+
+    return dbStore.feedback.get(userId) || [];
+  },
+
   // ============================================================================
   // WARDROBE ANALYTICS & INSIGHTS
   // ============================================================================
