@@ -10,13 +10,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { image, hint } = body;
+    const { image, hint, clientColorHint } = body;
 
     if (!image) {
       return NextResponse.json({ error: 'Image data or URL is required' }, { status: 400 });
     }
 
-    const classification = await classifyClothingImage(image, hint);
+    const classification = await classifyClothingImage(image, hint, clientColorHint);
     return NextResponse.json({ success: true, classification });
   } catch (error) {
     console.error('AI clothing classification error:', error);

@@ -135,9 +135,12 @@ export interface AIClassificationResult {
   name: string;
   primary_color: string;
   secondary_colors: string[];
+  color_confidence?: number;
   pattern: string;
   material?: string;
+  material_confidence?: number;
   fit: string;
+  fit_confidence?: number;
   style: string;
   formality: 'Casual' | 'Smart Casual' | 'Semi-Formal' | 'Formal' | 'Festive';
   season: string[];
