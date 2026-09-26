@@ -61,7 +61,7 @@ async function getImageInlineData(imageData: string): Promise<{ mimeType: string
 }
 
 /**
- * High-performance, high-accuracy clothing classification pipeline using Gemini Vision
+ * High-performance, high-accuracy clothing & accessories classification pipeline using Gemini Vision
  */
 export async function classifyClothingImage(
   imageData: string,
@@ -75,23 +75,46 @@ export async function classifyClothingImage(
     try {
       const imagePayload = await getImageInlineData(imageData);
 
-      // Ultra-concise, precision-engineered prompt for sub-2s execution
+      // Precision-engineered fashion vision prompt with explicit taxonomy mapping
       const promptText = `
 You are AUREVÉ's expert fashion vision classifier.
-Analyze this real clothing photograph. Isolate the garment region (ignore background, room, furniture, skin).
+Analyze this wardrobe piece image carefully. Identify what type of clothing, footwear, or accessory it actually is.
+Isolate the item region and ignore background, room, mannequin, furniture, or skin.
 
-MANDATORY RULES:
-1. "name": Formulate a concise human title: [Primary Color] + [Key Characteristic] + [Subcategory] (e.g. "Black Cotton T-Shirt", "Sky Blue Oxford Shirt", "Beige Straight-Fit Chinos", "Olive Green Overshirt"). NEVER use generic filenames.
-2. "category": Must be one of: ["tops", "bottoms", "layers", "footwear", "accessories"].
-3. "subcategory": Must match category:
+MANDATORY TAXONOMY RULES:
+1. "name": Formulate a concise, elegant human title: [Primary Color] + [Important Characteristic / Material / Fit] + [Subcategory]
+   Examples:
+   - "Black Leather Belt" (NEVER classify a belt as a T-shirt)
+   - "Brown Leather Belt"
+   - "Silver Stainless Steel Watch"
+   - "Black Chronograph Watch"
+   - "Black Half-Sleeve T-Shirt"
+   - "Sky Blue Oxford Shirt"
+   - "Dark Indigo Straight-Fit Jeans"
+   - "Beige Slim-Fit Chinos"
+   - "Navy Blue Tailored Blazer"
+   - "White Leather Sneakers"
+   - "Brown Leather Loafers"
+   NEVER use generic filenames, camera IDs, or technical names.
+2. "category": Must be strictly one of: ["tops", "bottoms", "layers", "footwear", "accessories"].
+   - accessories: Watches, Belts, Sunglasses, Bags, Caps, Hats, Wallets, Ties, Scarves, Jewelry, Pocket Squares
+   - footwear: Sneakers, Running Shoes, Formal Shoes, Loafers, Boots, Sandals, Kolhapuris, Slippers
+   - bottoms: Jeans, Chinos, Trousers, Formal Pants, Cargo Pants, Shorts, Track Pants, Joggers
+   - layers: Jackets, Blazers, Bomber Jackets, Denim Jackets, Sweaters, Cardigans, Hoodies, Coats, Overcoats
+   - tops: T-Shirts, Shirts, Polos, Kurtas, Overshirts, Henleys, Tank Tops, Sweatshirts
+3. "subcategory": Must strictly match the chosen category from this list:
+   - accessories: ["Watch", "Belt", "Sunglasses", "Cap", "Hat", "Wallet", "Bag", "Bracelet", "Ring", "Tie", "Pocket Square", "Scarf", "Other"]
+   - footwear: ["Sneakers", "Running Shoes", "Formal Shoes", "Loafers", "Boots", "Sandals", "Kolhapuris", "Slippers", "Flip-Flops", "Sports Shoes", "Other"]
+   - bottoms: ["Jeans", "Chinos", "Trousers", "Formal Pants", "Cargo Pants", "Track Pants", "Shorts", "Joggers", "Dhoti", "Pajama", "Other"]
+   - layers: ["Jacket", "Blazer", "Bomber Jacket", "Denim Jacket", "Windbreaker", "Sweater", "Cardigan", "Hoodie", "Coat", "Overcoat", "Other"]
    - tops: ["T-Shirt", "Shirt", "Polo", "Kurta", "Overshirt", "Henley", "Tank Top", "Sweatshirt", "Hoodie", "Other"]
-   - bottoms: ["Jeans", "Chinos", "Trousers", "Formal Pants", "Cargo Pants", "Track Pants", "Shorts", "Joggers", "Other"]
-   - layers: ["Jacket", "Blazer", "Bomber Jacket", "Denim Jacket", "Windbreaker", "Sweater", "Cardigan", "Hoodie", "Coat", "Other"]
-   - footwear: ["Sneakers", "Running Shoes", "Formal Shoes", "Loafers", "Boots", "Sandals", "Kolhapuris", "Other"]
-   - accessories: ["Watch", "Belt", "Sunglasses", "Cap", "Hat", "Bag", "Other"]
-4. "primary_color": Strictly choose from: ${JSON.stringify(PRIMARY_COLOR_OPTIONS)}. (Black vs Navy vs Charcoal vs Dark Grey vs Olive vs Burgundy vs White vs Off-White vs Beige).
-5. "material": Strictly choose from: ${JSON.stringify(FABRIC_OPTIONS)}. If not clearly visible, return "Unknown / Not visible" or "Cotton".
-6. "fit": One of: ["Regular", "Slim", "Relaxed", "Oversized", "Tailored", "Not Applicable", "Unknown"].
+4. "primary_color": Strictly choose from: ${JSON.stringify(PRIMARY_COLOR_OPTIONS)}. (Accurately distinguish Black vs Charcoal vs Navy Blue vs Olive Green vs Brown vs Burgundy vs White vs Off-White vs Beige).
+5. "material": Strictly choose from: ${JSON.stringify(FABRIC_OPTIONS)}.
+   - For leather belts/shoes/bags: choose "Leather" or "Suede".
+   - For metal watches: choose "Other" or "Unknown / Not visible".
+   - For jeans: choose "Denim".
+   - If not clearly visible, choose "Unknown / Not visible" or "Cotton".
+6. "fit": One of: ["Regular", "Slim", "Relaxed", "Oversized", "Tailored", "Not Applicable", "Unknown"]. (For accessories and footwear, ALWAYS return "Not Applicable").
 7. "pattern": One of: ["Solid", "Striped", "Checked", "Plaid", "Textured / Self-Pattern", "Printed / Floral", "Graphic", "Colorblock", "Other"].
 8. "formality": One of: ["Casual", "Smart Casual", "Semi-Formal", "Formal", "Festive"].
 9. "style": One of: ["Smart Casual", "Minimal", "Modern Indian", "Casual", "Streetwear", "Formal", "Sporty"].
@@ -99,20 +122,20 @@ MANDATORY RULES:
 
 Return strictly valid JSON:
 {
-  "name": "Black Cotton Crewneck T-Shirt",
-  "category": "tops",
-  "subcategory": "T-Shirt",
+  "name": "Black Leather Belt",
+  "category": "accessories",
+  "subcategory": "Belt",
   "primary_color": "Black",
   "secondary_colors": [],
-  "color_confidence": 0.95,
+  "color_confidence": 0.96,
   "pattern": "Solid",
-  "material": "Cotton",
-  "material_confidence": 0.85,
-  "fit": "Regular",
-  "fit_confidence": 0.9,
-  "style": "Casual",
-  "formality": "Casual",
-  "season": ["Summer", "All-Season"]
+  "material": "Leather",
+  "material_confidence": 0.92,
+  "fit": "Not Applicable",
+  "fit_confidence": 1.0,
+  "style": "Smart Casual",
+  "formality": "Smart Casual",
+  "season": ["All-Season"]
 }
 `;
 
@@ -130,35 +153,53 @@ Return strictly valid JSON:
         parts.push({ text: `User hint: ${cleanHint}` });
       }
 
-      // Fast vision models with minimal overhead
-      const modelCandidates = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-3.8-flash'];
+      // Fast vision models with multi-model fallback and rate-limit resilience
+      const modelCandidates = [
+        'gemini-3.5-flash-lite',
+        'gemini-2.5-flash',
+        'gemini-3.5-flash',
+        'gemini-3.1-flash-lite',
+        'gemini-3.7-flash',
+        'gemini-3.8-flash',
+        'gemini-flash-latest',
+      ];
       let data: any = null;
 
-      for (const model of modelCandidates) {
-        try {
-          const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts }],
-                generationConfig: {
-                  responseMimeType: 'application/json',
-                  temperature: 0.1,
-                },
-              }),
-            }
-          );
+      for (let attempt = 0; attempt < 2 && !data; attempt++) {
+        for (const model of modelCandidates) {
+          try {
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts }],
+                  generationConfig: {
+                    responseMimeType: 'application/json',
+                    temperature: 0.1,
+                  },
+                }),
+              }
+            );
 
-          if (res.ok) {
-            data = await res.json();
-            if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-              break;
+            if (res.ok) {
+              data = await res.json();
+              if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                break;
+              }
+            } else if (res.status === 429 || res.status === 503) {
+              // Rate-limited or temporary service spike, immediately try next model candidate
+              continue;
             }
+          } catch (e) {
+            // Network failure on this model, try next
           }
-        } catch (e) {
-          console.warn(`Attempt with ${model} failed, trying next...`, e);
+        }
+
+        if (!data && attempt === 0) {
+          // Pause briefly before second retry attempt
+          await new Promise((r) => setTimeout(r, 600));
         }
       }
 
@@ -196,7 +237,7 @@ Return strictly valid JSON:
             }
 
             // Validate material
-            let material = parsed.material || 'Cotton';
+            let material = parsed.material || (validCat === 'accessories' && subcategory === 'Belt' ? 'Leather' : 'Cotton');
             const matchedMat = FABRIC_OPTIONS.find(
               (m) => m.toLowerCase() === String(material).toLowerCase()
             );
@@ -236,28 +277,28 @@ Return strictly valid JSON:
         }
       }
     } catch (err) {
-      console.warn('Gemini vision API error, using intelligent visual fallback:', err);
+      console.warn('Gemini vision API error, using honest grounded fallback:', err);
     }
   }
 
-  // Intelligent, grounded fallback (never hallucinations or generic white shirt)
+  // Honest grounded fallback that never hallucinates a fake T-Shirt
   return fallbackGroundedClassifier(clientColorHint, cleanHint);
 }
 
 /**
- * Intelligent Grounded Fallback that never uses filenames and grounds to the real color
+ * Honest Grounded Fallback: Does NOT falsely claim every piece is a T-shirt or cotton
  */
 function fallbackGroundedClassifier(clientColorHint?: string, cleanHint?: string): AIClassificationResult {
   const detectedColor = clientColorHint || 'Black';
   const query = (cleanHint || '').toLowerCase();
 
   let category: MainCategory = 'tops';
-  let subcategory = 'T-Shirt';
-  let name = `${detectedColor} T-Shirt`;
-  let material = 'Cotton';
+  let subcategory = 'Shirt';
+  let name = `${detectedColor} Piece`;
+  let material = 'Unknown / Not visible';
   let fit = 'Regular';
   let formality: 'Casual' | 'Smart Casual' | 'Semi-Formal' | 'Formal' | 'Festive' = 'Casual';
-  let style = 'Casual';
+  let style = 'Smart Casual';
 
   if (query.includes('shoe') || query.includes('sneaker') || query.includes('loafer') || query.includes('boot')) {
     category = 'footwear';
@@ -280,30 +321,36 @@ function fallbackGroundedClassifier(clientColorHint?: string, cleanHint?: string
     material = query.includes('sweater') ? 'Wool / Cashmere' : 'Cotton Twill';
     fit = 'Regular';
     formality = query.includes('blazer') ? 'Formal' : 'Smart Casual';
-  } else if (query.includes('watch') || query.includes('belt') || query.includes('sunglasses')) {
+  } else if (query.includes('watch') || query.includes('belt') || query.includes('sunglasses') || query.includes('bag') || query.includes('wallet')) {
     category = 'accessories';
-    subcategory = query.includes('watch') ? 'Watch' : query.includes('belt') ? 'Belt' : 'Sunglasses';
+    subcategory = query.includes('watch') ? 'Watch' : query.includes('belt') ? 'Belt' : query.includes('bag') ? 'Bag' : query.includes('wallet') ? 'Wallet' : 'Sunglasses';
     name = `${detectedColor} ${subcategory}`;
-    material = query.includes('belt') ? 'Leather' : 'Other';
+    material = query.includes('belt') || query.includes('wallet') || query.includes('bag') ? 'Leather' : 'Other';
     fit = 'Not Applicable';
     formality = 'Smart Casual';
   } else if (query.includes('polo')) {
     category = 'tops';
     subcategory = 'Polo';
-    name = `${detectedColor} Pique Polo`;
+    name = `${detectedColor} Polo`;
     material = 'Cotton';
     formality = 'Smart Casual';
   } else if (query.includes('kurta')) {
     category = 'tops';
     subcategory = 'Kurta';
-    name = `${detectedColor} Modern Kurta`;
+    name = `${detectedColor} Kurta`;
     material = 'Linen';
     formality = 'Festive';
     style = 'Modern Indian';
-  } else if (query.includes('shirt') && !query.includes('t-shirt') && !query.includes('tshirt')) {
+  } else if (query.includes('t-shirt') || query.includes('tshirt') || query.includes('tee')) {
+    category = 'tops';
+    subcategory = 'T-Shirt';
+    name = `${detectedColor} T-Shirt`;
+    material = 'Cotton';
+    formality = 'Casual';
+  } else if (query.includes('shirt')) {
     category = 'tops';
     subcategory = 'Shirt';
-    name = `${detectedColor} Button-Down Shirt`;
+    name = `${detectedColor} Shirt`;
     material = 'Cotton';
     formality = 'Smart Casual';
   }
@@ -314,12 +361,12 @@ function fallbackGroundedClassifier(clientColorHint?: string, cleanHint?: string
     name,
     primary_color: detectedColor,
     secondary_colors: [],
-    color_confidence: 0.88,
+    color_confidence: 0.85,
     pattern: 'Solid',
     material,
-    material_confidence: 0.8,
+    material_confidence: 0.7,
     fit,
-    fit_confidence: 0.85,
+    fit_confidence: 0.75,
     style,
     formality,
     season: ['All-Season', 'Summer'],

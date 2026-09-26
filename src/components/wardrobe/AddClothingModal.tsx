@@ -279,12 +279,12 @@ export function AddClothingModal({
         id: `cam_${Date.now()}_${idx}`,
         imageUrl: dataUrl,
         clientColorHint: colorHint,
-        name: 'Wardrobe Piece',
+        name: `${colorHint} Piece`,
         category: 'tops',
-        subcategory: 'T-Shirt',
+        subcategory: 'Other',
         primaryColor: colorHint,
         pattern: 'Solid',
-        material: 'Cotton',
+        material: 'Unknown / Not visible',
         fit: 'Regular',
         style: 'Smart Casual',
         formality: 'Casual',
@@ -316,12 +316,12 @@ export function AddClothingModal({
           id: `file_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 6)}`,
           imageUrl: dataUrl,
           clientColorHint: colorHint,
-          name: 'Wardrobe Piece',
+          name: `${colorHint} Piece`,
           category: 'tops',
-          subcategory: 'T-Shirt',
+          subcategory: 'Other',
           primaryColor: colorHint,
           pattern: 'Solid',
-          material: 'Cotton',
+          material: 'Unknown / Not visible',
           fit: 'Regular',
           style: 'Smart Casual',
           formality: 'Casual',
@@ -340,7 +340,7 @@ export function AddClothingModal({
     }
   };
 
-  // Run AI Classification sequentially / batch with progress and timeout protection
+  // Run AI Classification sequentially / batch with retry, rate-limit protection, and progress
   const processBatchAI = async (items: StagedItem[]) => {
     setStep('analyzing');
     const updated = [...items];
@@ -350,79 +350,93 @@ export function AddClothingModal({
       updated[i].status = 'analyzing';
       setStagedItems([...updated]);
 
-      try {
-        // Fast 7s abort timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 7000);
+      let classified = false;
+      const maxRetries = 2;
 
-        const res = await fetch('/api/wardrobe/classify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            image: updated[i].imageUrl,
-            clientColorHint: updated[i].clientColorHint,
-          }),
-          signal: controller.signal,
-        });
+      for (let attempt = 0; attempt < maxRetries && !classified; attempt++) {
+        try {
+          // Fast 9s abort timeout per request
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 9000);
 
-        clearTimeout(timeoutId);
+          const res = await fetch('/api/wardrobe/classify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: updated[i].imageUrl,
+              clientColorHint: updated[i].clientColorHint,
+            }),
+            signal: controller.signal,
+          });
 
-        const data = await res.json();
-        if (data.success && data.classification) {
-          const c = data.classification;
-          const detectedCategory: MainCategory = c.category || 'tops';
-          const validSubcategories = SUBCATEGORIES_BY_CATEGORY[detectedCategory] || SUBCATEGORIES_BY_CATEGORY.tops;
-          const detectedSubcategory = validSubcategories.includes(c.subcategory)
-            ? c.subcategory
-            : validSubcategories[0];
+          clearTimeout(timeoutId);
 
-          // Formulate human clothing name
-          const colorName = c.primary_color || updated[i].clientColorHint || 'Black';
-          let finalName = c.name;
-          if (!finalName || finalName.toLowerCase().includes('whatsapp') || finalName.toLowerCase().includes('image')) {
-            finalName = `${colorName} ${detectedSubcategory}`;
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.classification) {
+              const c = data.classification;
+              const detectedCategory: MainCategory = c.category || 'tops';
+              const validSubcategories = SUBCATEGORIES_BY_CATEGORY[detectedCategory] || SUBCATEGORIES_BY_CATEGORY.tops;
+              const detectedSubcategory = validSubcategories.includes(c.subcategory)
+                ? c.subcategory
+                : validSubcategories[0];
+
+              // Formulate clean human clothing name
+              const colorName = c.primary_color || updated[i].clientColorHint || 'Black';
+              let finalName = c.name;
+              if (!finalName || finalName.toLowerCase().includes('whatsapp') || finalName.toLowerCase().includes('image') || finalName.length < 3) {
+                finalName = `${colorName} ${detectedSubcategory}`;
+              }
+
+              updated[i] = {
+                ...updated[i],
+                name: finalName,
+                category: detectedCategory,
+                subcategory: detectedSubcategory,
+                primaryColor: colorName,
+                pattern: c.pattern || 'Solid',
+                material: c.material || (detectedCategory === 'accessories' && detectedSubcategory === 'Belt' ? 'Leather' : 'Cotton'),
+                fit: c.fit || (detectedCategory === 'accessories' || detectedCategory === 'footwear' ? 'Not Applicable' : 'Regular'),
+                style: c.style || 'Smart Casual',
+                formality: c.formality || 'Smart Casual',
+                season: c.season && c.season.length > 0 ? c.season : ['All-Season'],
+                status: 'done',
+              };
+              classified = true;
+            }
+          } else if (res.status === 429 || res.status === 503) {
+            // Rate limit encountered, pause before retrying
+            await new Promise((r) => setTimeout(r, 1200));
           }
-
-          updated[i] = {
-            ...updated[i],
-            name: finalName,
-            category: detectedCategory,
-            subcategory: detectedSubcategory,
-            primaryColor: colorName,
-            pattern: c.pattern || 'Solid',
-            material: c.material || 'Cotton',
-            fit: c.fit || (detectedCategory === 'accessories' || detectedCategory === 'footwear' ? 'Not Applicable' : 'Regular'),
-            style: c.style || 'Smart Casual',
-            formality: c.formality || 'Smart Casual',
-            season: c.season && c.season.length > 0 ? c.season : ['All-Season'],
-            status: 'done',
-          };
-        } else {
-          // Fallback to grounded local color and subcategory
-          const color = updated[i].clientColorHint || 'Black';
-          updated[i] = {
-            ...updated[i],
-            name: `${color} T-Shirt`,
-            primaryColor: color,
-            category: 'tops',
-            subcategory: 'T-Shirt',
-            status: 'done',
-          };
+        } catch (err: any) {
+          console.warn(`Classification attempt ${attempt + 1} failed:`, err);
+          if (attempt < maxRetries - 1) {
+            await new Promise((r) => setTimeout(r, 1000));
+          }
         }
-      } catch (err: any) {
-        console.warn('Classification network fallback:', err);
+      }
+
+      if (!classified) {
+        // Honest fallback that does not hallucinate fake T-shirt or Cotton
         const color = updated[i].clientColorHint || 'Black';
         updated[i] = {
           ...updated[i],
-          name: `${color} T-Shirt`,
+          name: `${color} Piece`,
           primaryColor: color,
           category: 'tops',
-          subcategory: 'T-Shirt',
+          subcategory: 'Other',
+          material: 'Unknown / Not visible',
+          fit: 'Regular',
           status: 'done',
         };
       }
 
       setStagedItems([...updated]);
+
+      // Small 250ms spacing between items to stay well within API rate limits
+      if (i < updated.length - 1) {
+        await new Promise((r) => setTimeout(r, 250));
+      }
     }
 
     setActiveReviewIndex(0);

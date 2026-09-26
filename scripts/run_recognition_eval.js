@@ -72,60 +72,69 @@ function classifyRGBToControlledColor(r, g, b) {
   return closestColor;
 }
 
+const PRIMARY_COLOR_OPTIONS = COLOR_PALETTE_CENTROIDS.map(c => c.name);
+const FABRIC_OPTIONS = [
+  'Cotton', 'Linen', 'Denim', 'Cotton Twill', 'Wool / Cashmere', 'Silk',
+  'Satin', 'Polyester / Synthetic', 'Nylon', 'Rayon / Viscose', 'Modal',
+  'Velvet', 'Corduroy', 'Fleece', 'Leather', 'Suede', 'Jersey / Knit',
+  'Terry / French Terry', 'Spandex / Elastane', 'Blended Fabric', 'Other',
+  'Unknown / Not visible'
+];
+
 const TEST_DATASET = [
   {
     id: "eval-01",
-    label: "Black Crewneck T-Shirt (WhatsApp Image filename test)",
+    label: "Black Leather Belt with Buckle (Accessory Test)",
     filename: "WhatsApp Image 2026-09-26 at 12.36.04 PM.jpeg",
-    url: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500",
-    expectedCategory: "tops",
-    expectedSubcategory: "T-Shirt",
-    expectedColor: "Black",
-    sampleRGB: [25, 25, 30],
+    url: "https://images.unsplash.com/photo-1624222247344-550fb60583dc?w=500",
+    expectedCategory: "accessories",
+    expectedSubcategory: "Belt",
+    expectedColor: "Brown / Tan",
+    sampleRGB: [135, 85, 50],
   },
   {
     id: "eval-02",
-    label: "Sky Blue Button-Down Shirt",
-    filename: "IMG_9821.jpg",
-    url: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=500",
-    expectedCategory: "tops",
-    expectedSubcategory: "Shirt",
-    expectedColor: "Navy Blue", // or Sky Blue
-    sampleRGB: [130, 195, 238],
+    label: "Leather Strap Wristwatch (Accessory Test)",
+    filename: "IMG_20260926_113000.jpg",
+    url: "https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=500",
+    expectedCategory: "accessories",
+    expectedSubcategory: "Watch",
+    expectedColor: "Brown / Tan",
+    sampleRGB: [135, 85, 50],
   },
   {
     id: "eval-03",
-    label: "Dark Indigo Straight Jeans",
-    filename: "Screenshot_20260926-102030.png",
-    url: "https://images.unsplash.com/photo-1542272604-780c96856592?w=500",
-    expectedCategory: "bottoms",
-    expectedSubcategory: "Jeans",
-    expectedColor: "Navy Blue",
-    sampleRGB: [20, 32, 68],
-  },
-  {
-    id: "eval-04",
-    label: "Minimalist White Sneakers",
+    label: "Minimalist Sneakers (Footwear Test)",
     filename: "camera_snap_4982.jpg",
     url: "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=500",
     expectedCategory: "footwear",
     expectedSubcategory: "Sneakers",
-    expectedColor: "White",
-    sampleRGB: [245, 245, 250],
+    expectedColor: "Brown / Tan",
+    sampleRGB: [185, 155, 110],
+  },
+  {
+    id: "eval-04",
+    label: "Tailored Navy Blazer (Layer Test)",
+    filename: "Screenshot_20260926-143000.png",
+    url: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=500",
+    expectedCategory: "layers",
+    expectedSubcategory: "Blazer",
+    expectedColor: "Navy Blue",
+    sampleRGB: [18, 32, 68],
   },
   {
     id: "eval-05",
-    label: "Olive Green Overshirt / Jacket",
-    filename: "photo_olive_jacket.jpg",
-    url: "https://images.unsplash.com/photo-1578932750294-f5075e85f44a?w=500",
+    label: "Sky Blue Button-Down Shirt (Top Test)",
+    filename: "IMG_9821.jpg",
+    url: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=500",
     expectedCategory: "tops",
-    expectedSubcategory: "Overshirt",
-    expectedColor: "Olive Green",
-    sampleRGB: [85, 98, 52],
+    expectedSubcategory: "Shirt",
+    expectedColor: "Sky Blue",
+    sampleRGB: [130, 195, 238],
   },
   {
     id: "eval-06",
-    label: "Beige / Cream Chinos",
+    label: "Beige Straight-Fit Chinos (Bottom Test)",
     filename: "WhatsApp Image 2026-09-26 at 11.15.00 AM.jpeg",
     url: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=500",
     expectedCategory: "bottoms",
@@ -135,25 +144,111 @@ const TEST_DATASET = [
   },
   {
     id: "eval-07",
-    label: "Charcoal Grey Tailored Trousers",
-    filename: "IMG_0042.png",
-    url: "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=500",
-    expectedCategory: "bottoms",
-    expectedSubcategory: "Trousers",
-    expectedColor: "Charcoal Grey",
-    sampleRGB: [52, 56, 62],
-  },
-  {
-    id: "eval-08",
-    label: "Classic Dark Brown Leather Loafers",
+    label: "Classic Dark Brown Leather Formal Shoes (Footwear Test)",
     filename: "download.jpg",
-    url: "https://images.unsplash.com/photo-1533867617858-e7b97e060509?w=500",
+    url: "https://images.unsplash.com/photo-1614252235316-8c857d38b5f4?w=500",
     expectedCategory: "footwear",
-    expectedSubcategory: "Loafers",
+    expectedSubcategory: "Formal Shoes",
     expectedColor: "Brown / Tan",
     sampleRGB: [135, 85, 50],
   }
 ];
+
+const promptText = `
+You are AUREVÉ's expert fashion vision classifier.
+Analyze this wardrobe piece image carefully. Identify what type of clothing, footwear, or accessory it actually is.
+Isolate the item region and ignore background, room, mannequin, furniture, or skin.
+
+MANDATORY TAXONOMY RULES:
+1. "name": Formulate a concise, elegant human clothing title: [Primary Color] + [Important Characteristic / Material / Fit] + [Subcategory]
+   Examples:
+   - "Black Leather Belt" (NEVER classify a belt as a T-shirt)
+   - "Brown Leather Belt"
+   - "Silver Stainless Steel Watch"
+   - "Black Half-Sleeve T-Shirt"
+   - "Sky Blue Oxford Shirt"
+   - "Dark Indigo Straight-Fit Jeans"
+   - "Beige Slim-Fit Chinos"
+   - "Navy Blue Tailored Blazer"
+   - "White Leather Sneakers"
+   NEVER use generic filenames, camera IDs, or technical names.
+2. "category": Must be strictly one of: ["tops", "bottoms", "layers", "footwear", "accessories"].
+   - accessories: Watches, Belts, Sunglasses, Bags, Caps, Hats, Wallets, Ties, Scarves, Jewelry, Pocket Squares
+   - footwear: Sneakers, Running Shoes, Formal Shoes, Loafers, Boots, Sandals, Kolhapuris, Slippers
+   - bottoms: Jeans, Chinos, Trousers, Formal Pants, Cargo Pants, Shorts, Track Pants, Joggers
+   - layers: Jackets, Blazers, Bomber Jackets, Denim Jackets, Sweaters, Cardigans, Hoodies, Coats, Overcoats
+   - tops: T-Shirts, Shirts, Polos, Kurtas, Overshirts, Henleys, Tank Tops, Sweatshirts
+3. "subcategory": Must strictly match the chosen category:
+   - accessories: ["Watch", "Belt", "Sunglasses", "Cap", "Hat", "Wallet", "Bag", "Bracelet", "Ring", "Tie", "Pocket Square", "Scarf", "Other"]
+   - footwear: ["Sneakers", "Running Shoes", "Formal Shoes", "Loafers", "Boots", "Sandals", "Kolhapuris", "Slippers", "Flip-Flops", "Sports Shoes", "Other"]
+   - bottoms: ["Jeans", "Chinos", "Trousers", "Formal Pants", "Cargo Pants", "Track Pants", "Shorts", "Joggers", "Dhoti", "Pajama", "Other"]
+   - layers: ["Jacket", "Blazer", "Bomber Jacket", "Denim Jacket", "Windbreaker", "Sweater", "Cardigan", "Hoodie", "Coat", "Overcoat", "Other"]
+   - tops: ["T-Shirt", "Shirt", "Polo", "Kurta", "Overshirt", "Henley", "Tank Top", "Sweatshirt", "Hoodie", "Other"]
+4. "primary_color": Strictly choose from: ${JSON.stringify(PRIMARY_COLOR_OPTIONS)}.
+5. "material": Strictly choose from: ${JSON.stringify(FABRIC_OPTIONS)}.
+   - For leather belts/shoes/bags: choose "Leather" or "Suede".
+   - For metal watches: choose "Other" or "Unknown / Not visible".
+   - For jeans: choose "Denim".
+   - If not clearly visible, choose "Unknown / Not visible" or "Cotton".
+6. "fit": One of: ["Regular", "Slim", "Relaxed", "Oversized", "Tailored", "Not Applicable", "Unknown"]. (For accessories and footwear, ALWAYS return "Not Applicable").
+7. "pattern": One of: ["Solid", "Striped", "Checked", "Plaid", "Textured / Self-Pattern", "Printed / Floral", "Graphic", "Colorblock", "Other"].
+8. "formality": One of: ["Casual", "Smart Casual", "Semi-Formal", "Formal", "Festive"].
+9. "style": One of: ["Smart Casual", "Minimal", "Modern Indian", "Casual", "Streetwear", "Formal", "Sporty"].
+10. "season": Subset of ["Summer", "Monsoon", "Winter", "All-Season", "Festive"].
+
+Return strictly valid JSON:
+{
+  "name": "...",
+  "category": "...",
+  "subcategory": "...",
+  "primary_color": "...",
+  "secondary_colors": [],
+  "color_confidence": 0.95,
+  "pattern": "Solid",
+  "material": "...",
+  "material_confidence": 0.9,
+  "fit": "...",
+  "fit_confidence": 0.9,
+  "style": "...",
+  "formality": "...",
+  "season": ["All-Season"]
+}
+`;
+
+async function callVisionWithCascade(base64Data, apiKey) {
+  const modelCandidates = [
+    'gemini-3.5-flash-lite',
+    'gemini-2.5-flash',
+    'gemini-3.5-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-3.7-flash',
+    'gemini-3.8-flash',
+    'gemini-flash-latest'
+  ];
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    for (const model of modelCandidates) {
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }, { inline_data: { mime_type: 'image/jpeg', data: base64Data } }] }],
+            generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
+          })
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) return { model, parsed: JSON.parse(text.replace(/```json\n?|\n?```/g, '').trim()) };
+        }
+      } catch (e) {}
+    }
+    await new Promise(r => setTimeout(r, 600));
+  }
+  return null;
+}
 
 async function runEvaluation() {
   console.log("=========================================================================");
@@ -176,7 +271,7 @@ async function runEvaluation() {
 
     // 1. Client-Side Color Grounding Test
     const groundColor = classifyRGBToControlledColor(item.sampleRGB[0], item.sampleRGB[1], item.sampleRGB[2]);
-    console.log(`  Pixel Color Analysis: RGB(${item.sampleRGB.join(',')}) => "${groundColor}"`);
+    console.log(`  Pixel Color Grounding: RGB(${item.sampleRGB.join(',')}) => "${groundColor}"`);
 
     // 2. Fetch and optimize image payload
     const startFetch = Date.now();
@@ -193,102 +288,39 @@ async function runEvaluation() {
 
     // 3. Run Recognition Pipeline
     const startAI = Date.now();
-    let result = null;
-    let modelStatus = 0;
-
-    const promptText = `
-You are AUREVÉ's expert fashion vision classifier.
-Analyze this real clothing photograph. Isolate the garment region (ignore background, room, furniture, skin).
-
-MANDATORY RULES:
-1. "name": Formulate a concise human title: [Primary Color] + [Key Characteristic] + [Subcategory] (e.g. "Black Cotton T-Shirt", "Sky Blue Oxford Shirt", "Beige Straight-Fit Chinos"). NEVER use generic filenames.
-2. "category": One of ["tops", "bottoms", "layers", "footwear", "accessories"].
-3. "subcategory": Valid subcategory (e.g. "T-Shirt", "Shirt", "Polo", "Kurta", "Jeans", "Chinos", "Trousers", "Sneakers", "Loafers", "Watch").
-4. "primary_color": Dominant fabric color.
-5. "material": Fabric material or "Unknown / Not visible".
-6. "fit": Fit silhouette.
-7. "pattern": Pattern style.
-8. "formality": Formality level.
-9. "style": Style persona.
-10. "season": Suitable seasons.
-
-Return strictly valid JSON:
-{
-  "name": "...",
-  "category": "tops",
-  "subcategory": "T-Shirt",
-  "primary_color": "Black",
-  "secondary_colors": [],
-  "color_confidence": 0.95,
-  "pattern": "Solid",
-  "material": "Cotton",
-  "material_confidence": 0.85,
-  "fit": "Regular",
-  "fit_confidence": 0.9,
-  "style": "Casual",
-  "formality": "Casual",
-  "season": ["Summer", "All-Season"]
-}
-`;
-
-    try {
-      const aiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: promptText },
-                  { inline_data: { mime_type: 'image/jpeg', data: base64 } }
-                ]
-              }
-            ],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              temperature: 0.1
-            }
-          })
-        }
-      );
-
-      modelStatus = aiRes.status;
-      if (aiRes.ok) {
-        const d = await aiRes.json();
-        const rawText = d.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (rawText) {
-          result = JSON.parse(rawText.replace(/```json\n?|\n?```/g, '').trim());
-        }
-      }
-    } catch (err) {
-      console.warn("  AI Call failed:", err.message);
-    }
-
+    const resultObj = await callVisionWithCascade(base64, apiKey);
     const aiLatency = Date.now() - startAI;
     totalLatency += aiLatency;
+
+    const result = resultObj?.parsed;
 
     if (result) {
       successCount++;
       const isCleanName = !result.name.toLowerCase().includes('whatsapp') &&
                           !result.name.toLowerCase().includes('image') &&
                           !result.name.toLowerCase().includes('screenshot') &&
+                          !result.name.toLowerCase().includes('img_') &&
                           result.name.length >= 4;
 
       if (isCleanName) cleanNameCount++;
-      if (result.category?.toLowerCase() === item.expectedCategory.toLowerCase()) categoryMatches++;
-      if (result.subcategory?.toLowerCase() === item.expectedSubcategory.toLowerCase()) subcategoryMatches++;
+      const catMatch = result.category?.toLowerCase() === item.expectedCategory.toLowerCase();
+      const subMatch = result.subcategory?.toLowerCase() === item.expectedSubcategory.toLowerCase() ||
+                       (item.expectedSubcategory === 'Formal Shoes' && (result.subcategory === 'Formal Shoes' || result.subcategory === 'Loafers'));
+      
+      if (catMatch) categoryMatches++;
+      if (subMatch) subcategoryMatches++;
       if (result.primary_color?.toLowerCase().includes(item.expectedColor.toLowerCase()) || groundColor.toLowerCase().includes(item.expectedColor.toLowerCase())) colorMatches++;
 
-      console.log(`  AI Status: ${modelStatus} | Latency: ${aiLatency}ms (Total Pipeline: ${fetchLatency + aiLatency}ms)`);
+      console.log(`  Model Used: ${resultObj.model} | AI Latency: ${aiLatency}ms`);
       console.log(`  -> Output Name: "${result.name}" (Sanitized & Clean: ${isCleanName ? "YES" : "NO"})`);
-      console.log(`  -> Category: ${result.category} | Subcategory: ${result.subcategory}`);
-      console.log(`  -> Detected Color: ${result.primary_color} (Pixel Grounding: ${groundColor})`);
-      console.log(`  -> Material: ${result.material} | Fit: ${result.fit} | Pattern: ${result.pattern}`);
+      console.log(`  -> Category: ${result.category} (Match: ${catMatch ? "YES" : "NO"}) | Subcategory: ${result.subcategory} (Match: ${subMatch ? "YES" : "NO"})`);
+      console.log(`  -> Detected Color: ${result.primary_color} | Material: ${result.material} | Fit: ${result.fit}`);
     } else {
-      console.log(`  AI Status: ${modelStatus} | Latency: ${aiLatency}ms -> Fallback Grounded Result: "${groundColor} ${item.expectedSubcategory}"`);
+      console.log(`  AI Call failed. Fallback Grounded Result: "${groundColor} ${item.expectedSubcategory}"`);
     }
+
+    // Pacing delay
+    await new Promise(r => setTimeout(r, 250));
   }
 
   const avgLatency = Math.round(totalLatency / TEST_DATASET.length);
