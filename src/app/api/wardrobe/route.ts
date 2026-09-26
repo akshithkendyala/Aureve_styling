@@ -102,3 +102,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to add item to wardrobe' }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await getSessionUser();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { ids, all } = body;
+
+    if (all === true) {
+      const success = await Repository.deleteAllWardrobeItems(session.userId);
+      if (!success) {
+        return NextResponse.json({ error: 'Failed to clear wardrobe' }, { status: 500 });
+      }
+      return NextResponse.json({ success: true, message: 'All clothes deleted successfully from your wardrobe' });
+    }
+
+    if (Array.isArray(ids) && ids.length > 0) {
+      const success = await Repository.deleteWardrobeItemsBatch(session.userId, ids);
+      if (!success) {
+        return NextResponse.json({ error: 'Failed to delete selected clothes' }, { status: 500 });
+      }
+      return NextResponse.json({
+        success: true,
+        count: ids.length,
+        message: `${ids.length} item(s) deleted successfully`,
+      });
+    }
+
+    return NextResponse.json(
+      { error: 'Please provide an array of item IDs to delete or set all: true.' },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error('Bulk delete wardrobe error:', error);
+    return NextResponse.json({ error: 'Failed to process deletion request' }, { status: 500 });
+  }
+}
+

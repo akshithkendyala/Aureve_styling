@@ -747,6 +747,57 @@ export const Repository = {
     return true;
   },
 
+  async deleteWardrobeItemsBatch(userId: string, itemIds: string[]): Promise<boolean> {
+    if (!userId || !itemIds || itemIds.length === 0) return true;
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      try {
+        const { error } = await supabaseAdmin
+          .from('wardrobe_items')
+          .delete()
+          .eq('user_id', userId)
+          .in('id', itemIds);
+
+        if (!error) {
+          const items = dbStore.wardrobe.get(userId) || [];
+          const idSet = new Set(itemIds);
+          dbStore.wardrobe.set(userId, items.filter((it) => !idSet.has(it.id)));
+          return true;
+        }
+      } catch (err) {
+        console.warn('Supabase deleteWardrobeItemsBatch note:', err);
+      }
+    }
+
+    const items = dbStore.wardrobe.get(userId) || [];
+    const idSet = new Set(itemIds);
+    dbStore.wardrobe.set(userId, items.filter((it) => !idSet.has(it.id)));
+    return true;
+  },
+
+  async deleteAllWardrobeItems(userId: string): Promise<boolean> {
+    if (!userId) return false;
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      try {
+        const { error } = await supabaseAdmin
+          .from('wardrobe_items')
+          .delete()
+          .eq('user_id', userId);
+
+        if (!error) {
+          dbStore.wardrobe.set(userId, []);
+          return true;
+        }
+      } catch (err) {
+        console.warn('Supabase deleteAllWardrobeItems note:', err);
+      }
+    }
+
+    dbStore.wardrobe.set(userId, []);
+    return true;
+  },
+
   async recordItemWorn(userId: string, itemId: string): Promise<void> {
     const item = await this.getWardrobeItemById(userId, itemId);
     if (item) {
