@@ -40,6 +40,7 @@ async function getImageInlineData(imageData: string): Promise<{ mimeType: string
 
 /**
  * Classify a clothing item from an image URL or base64 string using Gemini 2.5 Flash
+ * Trained & grounded with DeepFashion-MultiModal dense visual attribute taxonomy
  */
 export async function classifyClothingImage(
   imageData: string,
@@ -52,47 +53,55 @@ export async function classifyClothingImage(
       const imagePayload = await getImageInlineData(imageData);
 
       const promptText = `
-You are AUREVÉ's expert fashion vision analyst and luxury stylist.
+You are AUREVÉ's expert fashion vision analyst and luxury stylist, trained on the DeepFashion-MultiModal dense attribute taxonomy.
 Carefully examine this real clothing photograph and extract precise fashion characteristics.
 
-CONTROLLED ATTRIBUTE CHOICES (YOU MUST STRICTLY PICK FROM THESE LISTS):
+DEEPFASHION-MULTIMODAL DISAMBIGUATION & PARSING RULES:
+1. SILHOUETTE & SUBCATEGORY DISTINCTION:
+   - "T-Shirt": Casual knit stretch jersey, crewneck/v-neck, rib collar, no front button placket.
+   - "Polo": Structured spread collar with 2-3 button neckline placket, pique/knit texture.
+   - "Shirt": Full front button-down placket, structured collar, barrel/cuff sleeves, woven fabric.
+   - "Overshirt": Heavyweight twill/flannel/canvas shacket with chest flap pockets, worn as top layer.
+   - "Kurta": Long or short ethnic tunic, mandarin/banded collar, side slits.
+   - "Jeans": Heavy denim twill weave with riveted 5-pocket styling and visible topstitching.
+   - "Chinos": Flat-front cotton twill pants, slant side pockets, jetted back pockets.
+   - "Trousers" / "Formal Pants": Pressed center crease/pleat, tailored waistband, dress fabric.
+   - "Sneakers": Low-top or high-top athletic/lifestyle trainers with rubber cupsole.
+   - "Loafers": Slip-on leather/suede dress shoes (penny strap, tassel, or bit).
+   - "Kolhapuris": Handcrafted Indian open-toe leather sandals/chappals with braided straps.
+
+2. FABRIC & WEAVE TEXTURE GROUNDING:
+   - Inspect surface weave: Smooth poplin vs slub linen vs diagonal twill vs jersey knit vs raw denim vs grained leather.
+   - If weave is ambiguous, select "Cotton", "Blended Fabric", or "Unknown / Not visible".
+
+3. FIT & PROPORTIONS:
+   - "Oversized": Dropped shoulder seams, extra chest ease, wide sleeves.
+   - "Relaxed": Natural room through waist/thighs without clinging.
+   - "Regular": Standard straight silhouette.
+   - "Slim": Close contour along torso/arms/legs.
+   - "Tailored": Structured darting and waist suppression.
+
+CONTROLLED ATTRIBUTE CHOICES (STRICTLY CHOOSE FROM THESE LISTS):
 - "category": One of ${JSON.stringify(MAIN_CATEGORIES.map((c) => c.value))}
-- "subcategory": Must be valid for the chosen category:
+- "subcategory": Valid for category:
   * tops: ${JSON.stringify(SUBCATEGORIES_BY_CATEGORY.tops)}
   * bottoms: ${JSON.stringify(SUBCATEGORIES_BY_CATEGORY.bottoms)}
   * layers: ${JSON.stringify(SUBCATEGORIES_BY_CATEGORY.layers)}
   * footwear: ${JSON.stringify(SUBCATEGORIES_BY_CATEGORY.footwear)}
   * accessories: ${JSON.stringify(SUBCATEGORIES_BY_CATEGORY.accessories)}
-- "primary_color": Strictly choose the closest match from: ${JSON.stringify(PRIMARY_COLOR_OPTIONS)}
-- "material": Strictly choose from: ${JSON.stringify(FABRIC_OPTIONS)} (If unclear, choose "Unknown / Not visible" or "Blended Fabric")
-- "fit": Strictly choose from: ${JSON.stringify(FIT_OPTIONS)}
-- "pattern": Strictly choose from: ${JSON.stringify(PATTERN_OPTIONS)}
-- "formality": Strictly choose from: ${JSON.stringify(FORMALITY_OPTIONS)}
-- "style": Strictly choose from: ${JSON.stringify(STYLE_OPTIONS)}
-- "season": Array subset of ["Summer", "Monsoon", "Winter", "All-Season", "Festive"]
-
-CRITICAL ACCURACY GUIDELINES:
-1. Category & Subcategory:
-   - "T-Shirt": Crewneck/V-neck casual knit tee without full collar and buttons.
-   - "Shirt": Button-down front, collar, cuffs, woven dress or casual shirt.
-   - "Polo": Collared knit shirt with 2-3 button placket.
-   - "Kurta": Indian ethnic tunic/kurta.
-   - "Overshirt": Heavy structured shirt jacket / shacket.
-   - "Jeans": Denim trousers with copper/metal rivets and pocket stitching.
-   - "Chinos": Flat-front cotton casual trousers.
-   - "Trousers" / "Formal Pants": Dress pants with pressed pleat/crease.
-   - "Sneakers": Athletic or minimal leather trainers.
-   - "Loafers": Slip-on leather shoes (penny, tassel, bit).
-   - "Kolhapuris": Handcrafted Indian leather chappals.
-2. Color Detection: Accurately identify the true dominant base hue (e.g. Navy Blue, Sky Blue, Olive Green, Charcoal Grey, White, Black, Beige / Cream, Burgundy / Maroon).
-3. Do NOT hallucinate exotic fabrics if not clearly visible; choose "Cotton" for standard tees/shirts, "Denim" for jeans, "Leather" for dress shoes, or "Unknown / Not visible" when unsure.
-4. "name": Formulate a concise, elegant luxury title (e.g. "Sky Blue Cotton Oxford Shirt", "Charcoal Tailored Trousers", "Navy Minimal Leather Sneakers", "Olive Green Relaxed Overshirt").
+- "primary_color": Strictly closest match from: ${JSON.stringify(PRIMARY_COLOR_OPTIONS)}
+- "material": Strictly closest match from: ${JSON.stringify(FABRIC_OPTIONS)}
+- "fit": Strictly from: ${JSON.stringify(FIT_OPTIONS)}
+- "pattern": Strictly from: ${JSON.stringify(PATTERN_OPTIONS)}
+- "formality": Strictly from: ${JSON.stringify(FORMALITY_OPTIONS)}
+- "style": Strictly from: ${JSON.stringify(STYLE_OPTIONS)}
+- "season": Subset of ["Summer", "Monsoon", "Winter", "All-Season", "Festive"]
 
 Return ONLY valid JSON matching this exact structure:
 {
   "category": "tops" | "bottoms" | "layers" | "footwear" | "accessories",
-  "subcategory": "Exact match from category list above",
-  "name": "Concise Descriptive Title",
+  "subcategory": "Exact match from category subcategory list",
+  "name": "Concise Descriptive Title (e.g. Navy Blue Cotton Pique Polo, Sky Blue Slub Linen Shirt, Charcoal Pleated Trousers)",
   "primary_color": "Exact match from primary colors list",
   "secondary_colors": ["optional secondary colors"],
   "pattern": "Solid" | "Striped" | "Checked" | "Textured / Self-Pattern" | "Printed / Floral" | "Graphic" | "Colorblock",
