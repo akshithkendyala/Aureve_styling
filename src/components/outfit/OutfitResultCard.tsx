@@ -214,6 +214,37 @@ export function OutfitResultCard({
           </div>
         </div>
 
+        {/* COMPLETE YOUR LOOK — Intelligent Stylist Insight (Shown only when a high-impact gap exists) */}
+        {outfit.missing_item && (
+          <div className="mt-5 p-5 sm:p-6 rounded-2xl bg-white border border-[#E8DFD5] shadow-xs space-y-3 animate-in fade-in duration-300">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Compass className="w-4 h-4 text-[#7E6047]" />
+                <span className="text-[11px] font-bold uppercase tracking-widest text-[#7E6047]">
+                  {outfit.missing_item.title}
+                </span>
+              </div>
+              <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-[#FAF8F5] border border-[#E8DFD5] text-[#7E6047]">
+                Stylist Note
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <h4 className="font-serif text-base sm:text-lg font-semibold text-[#18181B]">
+                Suggested Addition: {outfit.missing_item.suggested_item}
+              </h4>
+              <p className="text-xs text-[#5E4633] leading-relaxed">
+                {outfit.missing_item.reason}
+              </p>
+            </div>
+
+            <div className="pt-1 text-[11px] text-[#7E6047] border-t border-[#F4EFEA]">
+              <strong className="text-[#18181B] font-semibold">WHY: </strong>
+              {outfit.missing_item.why_it_works}
+            </div>
+          </div>
+        )}
+
         {/* Action Controls */}
         <div className="mt-6 pt-5 border-t border-[#EBE5DB] flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center space-x-2">

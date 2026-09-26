@@ -94,6 +94,15 @@ export interface OutfitItemReference {
   item?: WardrobeItem;
 }
 
+export interface MissingItemSuggestion {
+  title: string;
+  suggested_item: string;
+  reason: string;
+  why_it_works: string;
+  category: 'tops' | 'bottoms' | 'footwear' | 'layers' | 'accessories';
+  priority: 'essential' | 'recommended';
+}
+
 export interface Outfit {
   id: string;
   user_id: string;
@@ -108,6 +117,7 @@ export interface Outfit {
   style_direction: string[]; // e.g., ["Simple", "Classy", "Modern"]
   items: OutfitItemReference[];
   alternative_looks?: AlternativeLook[];
+  missing_item?: MissingItemSuggestion | null;
   created_at: string;
   worn?: boolean;
 }

@@ -6,6 +6,7 @@ import {
   OccasionType,
   OutfitItemReference,
   AlternativeLook,
+  MissingItemSuggestion,
 } from '@/lib/types';
 import {
   OCCASION_RULES,
@@ -41,20 +42,58 @@ interface ScoredCombination {
 }
 
 /**
- * Filter items strictly by occasion rules
+ * Filter items strictly by occasion rules — zero tolerance for inappropriate garments
  */
-function isItemPermittedForOccasion(
+export function isItemPermittedForOccasion(
   item: WardrobeItem,
   category: 'tops' | 'bottoms' | 'footwear' | 'layers' | 'accessories',
   rule: OccasionRule
 ): boolean {
   const normSub = normalizeSubcategory(item.subcategory);
-  const pattern = (item.pattern || '').trim();
+  const nameLower = (item.name || '').toLowerCase();
+  const pattern = (item.pattern || '').trim().toLowerCase();
   const material = (item.material || '').trim().toLowerCase();
+
+  // Explicit keyword guardrails across subcategory and title
+  if (rule.forbiddenTopSubcategories.includes('Kurta')) {
+    if (normSub === 'Kurta' || nameLower.includes('kurta') || nameLower.includes('sherwani')) {
+      return false;
+    }
+  }
+
+  if (rule.forbiddenFootwearSubcategories.includes('Sandals')) {
+    if (
+      normSub === 'Sandals' ||
+      normSub === 'Kolhapuris' ||
+      nameLower.includes('sandal') ||
+      nameLower.includes('kolhapuri') ||
+      nameLower.includes('slippers')
+    ) {
+      return false;
+    }
+  }
+
+  if (rule.forbiddenFootwearSubcategories.includes('Sneakers')) {
+    if (normSub === 'Sneakers' || normSub === 'Running Shoes' || nameLower.includes('sneaker') || nameLower.includes('trainer')) {
+      return false;
+    }
+  }
+
+  if (rule.forbiddenBottomSubcategories.includes('Jeans')) {
+    if (normSub === 'Jeans' || nameLower.includes('jean') || nameLower.includes('denim')) {
+      return false;
+    }
+  }
+
+  if (rule.forbiddenBottomSubcategories.includes('Track Pants')) {
+    if (normSub === 'Track Pants' || normSub === 'Joggers' || nameLower.includes('track') || nameLower.includes('sweatpant')) {
+      return false;
+    }
+  }
 
   // Pattern check
   if (rule.forbiddenPatterns && pattern) {
-    if (rule.forbiddenPatterns.some((fp) => pattern.toLowerCase().includes(fp.toLowerCase()))) {
+    if (rule.forbiddenPatterns.some((fp) => pattern.includes(fp.toLowerCase()))) {
       return false;
     }
   }
@@ -66,34 +105,26 @@ function isItemPermittedForOccasion(
     }
   }
 
+  // Category specific allowed and forbidden checks
   if (category === 'tops') {
     if (rule.forbiddenTopSubcategories.some((f) => f.toLowerCase() === normSub.toLowerCase())) {
       return false;
     }
-    if (rule.strictness === 'STRICT_HARD' || rule.strictness === 'HIGH') {
-      return rule.allowedTopSubcategories.some((a) => a.toLowerCase() === normSub.toLowerCase());
-    }
-    return true;
+    return rule.allowedTopSubcategories.some((a) => a.toLowerCase() === normSub.toLowerCase());
   }
 
   if (category === 'bottoms') {
     if (rule.forbiddenBottomSubcategories.some((f) => f.toLowerCase() === normSub.toLowerCase())) {
       return false;
     }
-    if (rule.strictness === 'STRICT_HARD' || rule.strictness === 'HIGH') {
-      return rule.allowedBottomSubcategories.some((a) => a.toLowerCase() === normSub.toLowerCase());
-    }
-    return true;
+    return rule.allowedBottomSubcategories.some((a) => a.toLowerCase() === normSub.toLowerCase());
   }
 
   if (category === 'footwear') {
     if (rule.forbiddenFootwearSubcategories.some((f) => f.toLowerCase() === normSub.toLowerCase())) {
       return false;
     }
-    if (rule.strictness === 'STRICT_HARD' || rule.strictness === 'HIGH') {
-      return rule.allowedFootwearSubcategories.some((a) => a.toLowerCase() === normSub.toLowerCase());
-    }
-    return true;
+    return rule.allowedFootwearSubcategories.some((a) => a.toLowerCase() === normSub.toLowerCase());
   }
 
   if (category === 'layers') {
@@ -124,27 +155,37 @@ function evaluateColorHarmony(top: WardrobeItem, bottom: WardrobeItem, footwear?
   const bottomColor = bottom.primary_color.toLowerCase();
   const footColor = footwear?.primary_color.toLowerCase() || '';
 
-  let score = 15;
+  let score = 16;
 
-  const neutrals = ['black', 'white', 'off-white', 'charcoal grey', 'dark grey', 'light grey', 'beige / cream', 'camel / khaki'];
+  const neutrals = ['black', 'white', 'off-white', 'charcoal grey', 'dark grey', 'light grey', 'beige / cream', 'camel / khaki', 'sand'];
   const isTopNeutral = neutrals.some((n) => topColor.includes(n));
   const isBottomNeutral = neutrals.some((n) => bottomColor.includes(n));
 
   // Anchor principle: At least one piece should be a grounding neutral
   if (isTopNeutral || isBottomNeutral) {
+    score += 4;
+  }
+
+  // High contrast classics (Light top + Dark bottom, or Dark top + Light bottom)
+  if (
+    (topColor.includes('white') || topColor.includes('sky blue') || topColor.includes('beige') || topColor.includes('sand')) &&
+    (bottomColor.includes('navy') || bottomColor.includes('black') || bottomColor.includes('charcoal'))
+  ) {
     score += 5;
   }
 
-  // Classic high-contrast combos (e.g. Light top + Dark bottom, or vice versa)
-  if ((topColor.includes('white') || topColor.includes('sky blue') || topColor.includes('beige')) &&
-      (bottomColor.includes('navy') || bottomColor.includes('black') || bottomColor.includes('charcoal'))) {
-    score += 5;
+  // Monochrome / tonal elegance (All black or navy on navy)
+  if (topColor.includes('black') && bottomColor.includes('black')) {
+    score += 4;
   }
 
-  // Matching leather rules (Brown shoes with brown belt, black shoes with black belt)
+  // Matching leather rules
   if (footColor) {
     if ((footColor.includes('brown') || footColor.includes('tan')) && bottomColor.includes('navy')) {
-      score += 3; // Navy + Tan is elite
+      score += 2;
+    }
+    if (footColor.includes('white') && (bottomColor.includes('blue') || bottomColor.includes('black') || bottomColor.includes('grey'))) {
+      score += 3; // Clean white sneakers
     }
   }
 
@@ -152,7 +193,7 @@ function evaluateColorHarmony(top: WardrobeItem, bottom: WardrobeItem, footwear?
 }
 
 /**
- * Generate a unique combination fingerprint for history and anti-repetition tracking
+ * Unique combination fingerprint for anti-repetition tracking
  */
 function getCombinationFingerprint(topId: string, bottomId: string, footwearId?: string, layerId?: string): string {
   return `${topId}::${bottomId}::${footwearId || 'none'}::${layerId || 'none'}`;
@@ -174,7 +215,7 @@ function generateRankedCandidates(
   specialMode: string
 ): ScoredCombination[] {
   const recentFingerprints = new Set(
-    previousOutfits.slice(0, 10).map((o) => {
+    previousOutfits.slice(0, 15).map((o) => {
       const t = o.items.find((i) => i.role === 'top')?.wardrobe_item_id || '';
       const b = o.items.find((i) => i.role === 'bottom')?.wardrobe_item_id || '';
       const f = o.items.find((i) => i.role === 'footwear')?.wardrobe_item_id || '';
@@ -191,17 +232,15 @@ function generateRankedCandidates(
 
   for (const top of tops) {
     for (const bottom of bottoms) {
-      // Pick best footwear match for this top & bottom
       const footwearCandidates = footwears.length > 0 ? footwears : [undefined];
 
       for (const footwear of footwearCandidates) {
-        // Evaluate layer inclusion
         let layer: WardrobeItem | undefined;
         if (layers.length > 0 && (isCool || rule.formalityLevels.includes('Formal'))) {
           layer = layers.find((l) => l.is_favorite) || layers[0];
         }
 
-        // Accessories
+        // Match accessories
         const matchedAccessories: WardrobeItem[] = [];
         const watch = accessories.find((a) => normalizeSubcategory(a.subcategory) === 'Watch');
         if (watch && rule.maxAccessories >= 1) matchedAccessories.push(watch);
@@ -213,7 +252,7 @@ function generateRankedCandidates(
 
         const fingerprint = getCombinationFingerprint(top.id, bottom.id, footwear?.id, layer?.id);
 
-        let score = 50; // Base score
+        let score = 55; // Base score
 
         // 1. Occasion & Formality alignment (+25)
         const topFormality = top.formality || 'Smart Casual';
@@ -221,43 +260,54 @@ function generateRankedCandidates(
         if (rule.formalityLevels.includes(topFormality as any)) score += 12;
         if (rule.formalityLevels.includes(bottomFormality as any)) score += 13;
 
+        // 1b. Preferred Occasion Subcategories (+35 max)
+        const normTopSub = normalizeSubcategory(top.subcategory).toLowerCase();
+        const normBottomSub = normalizeSubcategory(bottom.subcategory).toLowerCase();
+        const normFootwearSub = footwear ? normalizeSubcategory(footwear.subcategory).toLowerCase() : '';
+
+        if (rule.preferredTopSubcategories?.some((pts) => pts.toLowerCase() === normTopSub)) {
+          score += 15;
+        }
+        if (rule.preferredBottomSubcategories?.some((pbs) => pbs.toLowerCase() === normBottomSub)) {
+          score += 10;
+        }
+        if (footwear && rule.preferredFootwearSubcategories?.some((pfs) => pfs.toLowerCase() === normFootwearSub)) {
+          score += 10;
+        }
+
         // 2. Color harmony (+25)
         score += evaluateColorHarmony(top, bottom, footwear);
 
-        // 3. Weather Suitability (+15)
+        // 3. Weather Suitability (+10 / -15)
         if (isHot) {
-          if ((top.material || '').toLowerCase().includes('linen') || (top.material || '').toLowerCase().includes('cotton')) score += 8;
-          if (layer) score -= 15; // Don't layer in 32°C heat unless strictly required
+          if ((top.material || '').toLowerCase().includes('linen') || (top.material || '').toLowerCase().includes('cotton')) score += 6;
+          if (layer) score -= 15;
         } else if (isCool) {
-          if (layer) score += 10;
+          if (layer) score += 8;
         }
 
         if (isRain) {
-          if ((bottom.primary_color || '').toLowerCase().includes('white')) score -= 15; // Avoid white pants in rain
+          if ((bottom.primary_color || '').toLowerCase().includes('white')) score -= 15;
         }
 
-        // 4. Rotation & Novelty Score (+15 / -30)
+        // 4. Anti-Repetition Penalty (-40 for exact repeats)
         if (recentFingerprints.has(fingerprint)) {
-          score -= 35; // Heavy penalty for exact repeat outfit
+          score -= 40;
         }
 
-        // Underused item bonus (fairness across old vs new items)
-        if ((top.times_worn || 0) === 0) score += 6;
-        if ((bottom.times_worn || 0) === 0) score += 6;
-
-        // User Profile preferences (+10)
+        // User Profile preferences (+5 / -20)
         if (userProfile?.favorite_colors) {
-          if (userProfile.favorite_colors.some((fc) => top.primary_color.includes(fc) || bottom.primary_color.includes(fc))) {
-            score += 5;
+          if (userProfile.favorite_colors.some((fc) => top.primary_color.toLowerCase().includes(fc.toLowerCase()) || bottom.primary_color.toLowerCase().includes(fc.toLowerCase()))) {
+            score += 4;
           }
         }
         if (userProfile?.avoided_colors) {
-          if (userProfile.avoided_colors.some((ac) => top.primary_color.includes(ac) || bottom.primary_color.includes(ac))) {
+          if (userProfile.avoided_colors.some((ac) => top.primary_color.toLowerCase().includes(ac.toLowerCase()) || bottom.primary_color.toLowerCase().includes(ac.toLowerCase()))) {
             score -= 20;
           }
         }
 
-        const title = generateSmartTitle(rule.name, top, bottom);
+        const title = generateSmartTitle(rule.key, top, bottom);
         const explanation = generateSmartExplanation(top, bottom, footwear, layer, rule, weather);
 
         candidates.push({
@@ -282,25 +332,29 @@ function generateRankedCandidates(
 
 function getStyleDirection(rule: OccasionRule, top: WardrobeItem, bottom: WardrobeItem): string[] {
   if (rule.key === 'interview') return ['Professional', 'Crisp', 'Executive'];
+  if (rule.key === 'party') return ['Modern', 'Classy', 'Night Out'];
   if (rule.key === 'wedding' || rule.key === 'festival') return ['Heritage', 'Celebratory', 'Contemporary Indian'];
   if (rule.key === 'date' || rule.key === 'dinner') return ['Alluring', 'Subtle', 'Effortless'];
   if (rule.key === 'office') return ['Structured', 'Clean', 'Modern Workwear'];
+  if (rule.key === 'college') return ['Youthful', 'Relaxed', 'Campus Casual'];
+  if (rule.key === 'gym') return ['Athletic', 'High-Mobility', 'Performance'];
+  if (rule.key === 'travel') return ['Transit Ready', 'Comfort-First', 'Breathable'];
   return ['Simple', 'Classy', 'Modern'];
 }
 
-function generateSmartTitle(occasion: string, top: WardrobeItem, bottom: WardrobeItem): string {
-  const occ = occasion.toLowerCase();
-  if (occ.includes('interview')) return 'Polished Executive Presence';
-  if (occ.includes('office') || occ.includes('work')) return 'Sharp Workday Minimalist';
-  if (occ.includes('presentation')) return 'Authoritative Keynote Presence';
-  if (occ.includes('wedding') || occ.includes('reception')) return 'Contemporary Celebratory Classic';
-  if (occ.includes('festival') || occ.includes('puja')) return 'Refined Festive Elegance';
-  if (occ.includes('date')) return 'Modern Effortless Date Night';
-  if (occ.includes('dinner')) return 'Refined Evening Palette';
-  if (occ.includes('college')) return 'Curated Campus Daily';
-  if (occ.includes('travel')) return 'High-Mobility Transit Edit';
-  if (occ.includes('gym')) return 'Performance Athletic Form';
-  return `Elevated ${occasion} Ensemble`;
+function generateSmartTitle(occasionKey: string, top: WardrobeItem, bottom: WardrobeItem): string {
+  if (occasionKey === 'interview') return 'Polished Executive Presence';
+  if (occasionKey === 'party') return 'Modern Night-Out Styling';
+  if (occasionKey === 'office') return 'Sharp Workday Minimalist';
+  if (occasionKey === 'presentation') return 'Authoritative Keynote Presence';
+  if (occasionKey === 'wedding') return 'Contemporary Celebratory Classic';
+  if (occasionKey === 'festival') return 'Refined Festive Elegance';
+  if (occasionKey === 'date') return 'Modern Effortless Date Night';
+  if (occasionKey === 'dinner') return 'Refined Evening Palette';
+  if (occasionKey === 'college') return 'Curated Campus Daily';
+  if (occasionKey === 'travel') return 'High-Mobility Transit Edit';
+  if (occasionKey === 'gym') return 'Performance Athletic Form';
+  return 'Elevated Casual Edit';
 }
 
 function generateSmartExplanation(
@@ -313,21 +367,139 @@ function generateSmartExplanation(
 ): string {
   const topName = top.name;
   const bottomName = bottom.name;
-  const footwearStr = footwear ? ` paired with ${footwear.name.toLowerCase()}` : '';
-  const layerStr = layer ? ` and structured with the ${layer.name.toLowerCase()}` : '';
+  const footwearStr = footwear ? ` anchored with ${footwear.name.toLowerCase()}` : '';
+  const layerStr = layer ? ` structured with the ${layer.name.toLowerCase()}` : '';
   const weatherStr = weather
-    ? ` In ${weather.city}'s ${weather.temperature}°C weather, this selection optimizes airflow and tailored ease.`
+    ? ` In ${weather.city}'s ${weather.temperature}°C conditions, this selection balances breathability with sharp tailoring.`
     : '';
 
   if (rule.key === 'interview') {
-    return `For your interview, the ${topName} paired with ${bottomName}${footwearStr} delivers a crisp, boardroom-ready presence with zero casual distractions.${weatherStr}`;
+    return `For your interview, the ${topName} paired with ${bottomName}${footwearStr} creates a crisp, boardroom-ready presence with zero casual distractions.${weatherStr}`;
+  }
+
+  if (rule.key === 'party') {
+    return `The ${topName} gives an intentional, modern evening vibe, paired with ${bottomName}${footwearStr} for a sleek and confident social look.${weatherStr}`;
   }
 
   if (rule.key === 'wedding' || rule.key === 'festival') {
-    return `The ${topName} harmonizes seamlessly with ${bottomName}${footwearStr}, creating a sophisticated celebratory silhouette that respects Indian occasion traditions.${weatherStr}`;
+    return `The ${topName} harmonizes seamlessly with ${bottomName}${footwearStr}, creating a sophisticated celebratory silhouette that respects festive traditions.${weatherStr}`;
   }
 
-  return `The ${topName} creates an intentional, balanced focal point against ${bottomName}${layerStr}${footwearStr}. This combination achieves effortless sophistication tailored for ${rule.name}.${weatherStr}`;
+  return `The ${topName} provides a balanced focal point against ${bottomName}${layerStr}${footwearStr}, tailored appropriately for ${rule.name}.${weatherStr}`;
+}
+
+/**
+ * Intelligent Missing-Item Evaluation Engine
+ * Returns a suggestion ONLY when an essential or styling gap genuinely exists for the occasion.
+ */
+export function evaluateMissingItem(
+  wardrobe: WardrobeItem[],
+  occasionKey: string,
+  chosenTop: WardrobeItem,
+  chosenBottom: WardrobeItem
+): MissingItemSuggestion | null {
+  const activeItems = wardrobe.filter((i) => !i.is_archived);
+
+  // Helper checks across entire active wardrobe
+  const hasSubcategory = (cat: string, subNames: string[]) =>
+    activeItems.some(
+      (it) =>
+        it.category === cat &&
+        subNames.some(
+          (sn) =>
+            normalizeSubcategory(it.subcategory).toLowerCase() === sn.toLowerCase() ||
+            it.name.toLowerCase().includes(sn.toLowerCase())
+        )
+    );
+
+  const hasNameKeyword = (keyword: string) =>
+    activeItems.some((it) => it.name.toLowerCase().includes(keyword.toLowerCase()));
+
+  if (occasionKey === 'party') {
+    const hasPartyShirt =
+      hasNameKeyword('party') ||
+      hasNameKeyword('cuban') ||
+      hasNameKeyword('satin') ||
+      activeItems.some(
+        (it) =>
+          it.category === 'tops' &&
+          (it.material?.toLowerCase().includes('silk') ||
+            it.pattern?.toLowerCase().includes('printed') ||
+            (it.primary_color?.toLowerCase().includes('black') && it.subcategory === 'Shirt'))
+      );
+
+    if (!hasPartyShirt) {
+      return {
+        title: 'Complete Your Party Look',
+        suggested_item: 'Deep Navy or Black Textured Party Shirt',
+        reason:
+          'Your wardrobe has good casual pieces, but a versatile party shirt would give you a more polished, evening-ready option for clubs and gatherings.',
+        why_it_works: `Pairs seamlessly with your ${chosenBottom.name} and clean sneakers for an instant evening upgrade.`,
+        category: 'tops',
+        priority: 'recommended',
+      };
+    }
+  }
+
+  if (occasionKey === 'interview') {
+    const hasFormalShoes = hasSubcategory('footwear', ['Formal Shoes', 'Oxford', 'Derby', 'Brogue']);
+    if (!hasFormalShoes) {
+      return {
+        title: 'Essential for Interviews',
+        suggested_item: 'Classic Black or Dark Brown Leather Oxfords',
+        reason:
+          'You have the tailored formal shirt and trousers. A pair of classic leather formal shoes is essential to establish executive polish.',
+        why_it_works: 'Anchors your formal trousers with boardroom-level credibility.',
+        category: 'footwear',
+        priority: 'essential',
+      };
+    }
+
+    const hasFormalBelt = hasSubcategory('accessories', ['Belt']);
+    if (!hasFormalBelt) {
+      return {
+        title: 'Polishing the Executive Presence',
+        suggested_item: 'Matching Leather Dress Belt',
+        reason: 'A clean leather belt aligned with your formal shoe tone anchors formal trousers cleanly.',
+        why_it_works: 'Creates a clean visual line between your shirt and trousers.',
+        category: 'accessories',
+        priority: 'recommended',
+      };
+    }
+  }
+
+  if (occasionKey === 'wedding') {
+    const hasNehruJacket = hasSubcategory('layers', ['Nehru Jacket', 'Waistcoat', 'Vest']);
+    const hasKurta = hasSubcategory('tops', ['Kurta', 'Sherwani']);
+
+    if (!hasNehruJacket && hasKurta) {
+      return {
+        title: 'Elevate Your Festive Look',
+        suggested_item: 'Tailored Silk or Jacquard Nehru Jacket',
+        reason: 'Layering a structured Nehru jacket over your Kurta immediately elevates the formality for wedding celebrations.',
+        why_it_works: 'Adds rich textural depth and regal structure for celebratory moments.',
+        category: 'layers',
+        priority: 'recommended',
+      };
+    }
+  }
+
+  if (occasionKey === 'gym') {
+    const hasRunningShoes = hasSubcategory('footwear', ['Running Shoes', 'Sports Shoes']);
+    if (!hasRunningShoes) {
+      return {
+        title: 'Essential for Workouts',
+        suggested_item: 'Performance Training / Running Shoes',
+        reason: 'Proper athletic footwear provides critical cushioning and joint support during training.',
+        why_it_works: 'Completes your activewear with correct biomechanical stability.',
+        category: 'footwear',
+        priority: 'essential',
+      };
+    }
+  }
+
+  // No urgent gaps found
+  return null;
 }
 
 /**
@@ -364,25 +536,25 @@ export async function generateIntelligentOutfit(
   let validLayers = activeItems.filter((i) => i.category === 'layers' && isItemPermittedForOccasion(i, 'layers', rule));
   let validAccessories = activeItems.filter((i) => i.category === 'accessories' && isItemPermittedForOccasion(i, 'accessories', rule));
 
-  // Fallback protection if wardrobe has limited items
+  // Fallback protection only if wardrobe genuinely lacks items in that category
   if (validTops.length === 0) {
-    // Pick the most formal tops available if strict filter was too narrow
     validTops = activeItems
-      .filter((i) => i.category === 'tops')
+      .filter((i) => i.category === 'tops' && !rule.forbiddenTopSubcategories.includes(normalizeSubcategory(i.subcategory)))
       .sort((a, b) => (a.formality === 'Formal' ? -1 : 1));
   }
   if (validBottoms.length === 0) {
-    // Pick the most formal bottoms available
     validBottoms = activeItems
-      .filter((i) => i.category === 'bottoms')
+      .filter((i) => i.category === 'bottoms' && !rule.forbiddenBottomSubcategories.includes(normalizeSubcategory(i.subcategory)))
       .sort((a, b) => (a.formality === 'Formal' ? -1 : 1));
   }
   if (validFootwear.length === 0) {
-    validFootwear = activeItems.filter((i) => i.category === 'footwear');
+    validFootwear = activeItems.filter(
+      (i) => i.category === 'footwear' && !rule.forbiddenFootwearSubcategories.includes(normalizeSubcategory(i.subcategory))
+    );
   }
 
   if (validTops.length === 0 || validBottoms.length === 0) {
-    throw new Error('You need at least one top and one bottom in your wardrobe to style an outfit.');
+    throw new Error(`Your wardrobe does not contain appropriate clothing pieces for ${rule.name}. Please add appropriate pieces to your wardrobe.`);
   }
 
   // Step 4: Generate Scored Deterministic Candidates
@@ -401,7 +573,7 @@ export async function generateIntelligentOutfit(
 
   const topCandidate = rankedCandidates[0];
   if (!topCandidate) {
-    throw new Error('Could not formulate a valid outfit for this occasion with your current wardrobe.');
+    throw new Error(`Could not formulate a valid outfit for ${rule.name} with your current wardrobe.`);
   }
 
   // Step 5: AI Styling Enhancement via Gemini with Strict Guardrails
@@ -441,15 +613,16 @@ ${footwearOptionsForPrompt.map((f) => `- ID: "${f.id}" | Name: "${f.name}" | Col
 
 MANDATORY INSTRUCTIONS:
 1. Select the most elegant, occasion-appropriate Top ID, Bottom ID, and Footwear ID from the lists above.
-2. NEVER select casual wear (e.g. track pants, hoodies, sneakers) for formal occasions (e.g. Interview).
-3. Return STRICT JSON:
+2. For PARTY, select stylish modern shirts / overshirts with clean jeans/chinos and sneakers/boots. NEVER select Kurta or Sandals.
+3. For INTERVIEW, select formal shirts, formal trousers, and formal shoes. NEVER select sneakers or t-shirts.
+4. Return STRICT JSON:
 {
-  "title": "Editorial title (e.g., Polished Executive Presence)",
+  "title": "Editorial title (e.g., Modern Night-Out Styling)",
   "selected_top_id": "EXACT_ID_FROM_TOPS",
   "selected_bottom_id": "EXACT_ID_FROM_BOTTOMS",
   "selected_footwear_id": "EXACT_ID_FROM_FOOTWEAR",
-  "style_direction": ["Professional", "Crisp", "Minimal"],
-  "ai_explanation": "2 concise sentences explaining why this exact combination commands authority and elegance for this occasion."
+  "style_direction": ["Modern", "Classy", "Confident"],
+  "ai_explanation": "2 concise sentences explaining why this exact combination works beautifully for this real-world occasion."
 }
 `;
 
@@ -542,6 +715,14 @@ MANDATORY INSTRUCTIONS:
     weather
   );
 
+  // Step 8: Evaluate Missing Items (Optional, Stylist-Led)
+  const missingItemSuggestion = evaluateMissingItem(
+    wardrobe,
+    rule.key,
+    finalLook.top,
+    finalLook.bottom
+  );
+
   return {
     occasion,
     date,
@@ -554,6 +735,7 @@ MANDATORY INSTRUCTIONS:
     style_direction: aiStyleDirection,
     items,
     alternative_looks: alternativeLooks,
+    missing_item: missingItemSuggestion,
   };
 }
 
@@ -625,4 +807,5 @@ function buildOccasionCompliantAlternatives(
 
   return alternatives;
 }
+
 
