@@ -1,7 +1,17 @@
 import { AIClassificationResult, MainCategory } from '@/lib/types';
+import {
+  FABRIC_OPTIONS,
+  FIT_OPTIONS,
+  FORMALITY_OPTIONS,
+  MAIN_CATEGORIES,
+  PATTERN_OPTIONS,
+  PRIMARY_COLOR_OPTIONS,
+  STYLE_OPTIONS,
+  SUBCATEGORIES_BY_CATEGORY,
+} from '@/lib/constants/clothingOptions';
 
 /**
- * Fetch remote image URL and convert to base64 inline data for Gemini Vision
+ * Fetch remote image URL or base64 and convert to inline data for Gemini Vision
  */
 async function getImageInlineData(imageData: string): Promise<{ mimeType: string; base64Data: string } | null> {
   try {
@@ -29,7 +39,7 @@ async function getImageInlineData(imageData: string): Promise<{ mimeType: string
 }
 
 /**
- * Classify a clothing item from an image URL or base64 string using AI vision
+ * Classify a clothing item from an image URL or base64 string using Gemini 2.5 Flash
  */
 export async function classifyClothingImage(
   imageData: string,
@@ -42,49 +52,55 @@ export async function classifyClothingImage(
       const imagePayload = await getImageInlineData(imageData);
 
       const promptText = `
-You are AUREVÉ's expert fashion vision analyst and tailor.
-Carefully examine this real garment image and extract precise fashion characteristics.
+You are AUREVÉ's expert fashion vision analyst and luxury stylist.
+Carefully examine this real clothing photograph and extract precise fashion characteristics.
 
-CRITICAL CLASSIFICATION INSTRUCTIONS:
-1. DISTINGUISH SUBCATEGORIES ACCURATELY:
-   - "t-shirt": Crewneck / round neck or V-neck, casual knit tee without full collar and buttons.
-   - "shirt": Button-down front, formal/casual collar, cuffs, woven fabric (e.g. Oxford, Linen, Poplin, Denim shirt).
-   - "polo": T-shirt with a structured collar and 2-3 button placket.
-   - "overshirt": Heavy shirt jacket / shacket, thick cotton or twill worn open or closed.
-   - "kurta": Indian ethnic long or short kurta tunic.
-   - "jeans": Denim cotton with visible twill texture, pockets, and rivets.
-   - "trousers": Formal or dress pants, pressed creases, pleated or flat front.
-   - "chinos": Casual cotton trousers, flat-front, casual pockets.
-   - "sneakers": Athletic or casual minimal leather/canvas trainers.
-   - "loafers": Slip-on leather shoes (penny loafers, tassels, horsebit).
-   - "kolhapuris": Handcrafted Indian leather sandals or ethnic chappals.
-   - "watch": Wristwatch with dial and strap.
+CONTROLLED ATTRIBUTE CHOICES (YOU MUST STRICTLY PICK FROM THESE LISTS):
+- "category": One of ${JSON.stringify(MAIN_CATEGORIES.map((c) => c.value))}
+- "subcategory": Must be valid for the chosen category:
+  * tops: ${JSON.stringify(SUBCATEGORIES_BY_CATEGORY.tops)}
+  * bottoms: ${JSON.stringify(SUBCATEGORIES_BY_CATEGORY.bottoms)}
+  * layers: ${JSON.stringify(SUBCATEGORIES_BY_CATEGORY.layers)}
+  * footwear: ${JSON.stringify(SUBCATEGORIES_BY_CATEGORY.footwear)}
+  * accessories: ${JSON.stringify(SUBCATEGORIES_BY_CATEGORY.accessories)}
+- "primary_color": Strictly choose the closest match from: ${JSON.stringify(PRIMARY_COLOR_OPTIONS)}
+- "material": Strictly choose from: ${JSON.stringify(FABRIC_OPTIONS)} (If unclear, choose "Unknown / Not visible" or "Blended Fabric")
+- "fit": Strictly choose from: ${JSON.stringify(FIT_OPTIONS)}
+- "pattern": Strictly choose from: ${JSON.stringify(PATTERN_OPTIONS)}
+- "formality": Strictly choose from: ${JSON.stringify(FORMALITY_OPTIONS)}
+- "style": Strictly choose from: ${JSON.stringify(STYLE_OPTIONS)}
+- "season": Array subset of ["Summer", "Monsoon", "Winter", "All-Season", "Festive"]
 
-2. FIT DETECTION:
-   - "Oversized": Dropped shoulders, very wide chest/sleeves, relaxed baggy silhouette.
-   - "Relaxed": Easy breezy drape, loose through waist and arms without tight tapering.
-   - "Regular": Classic standard proportion, straight cut.
-   - "Slim": Fitted close to torso/arms/thighs.
-   - "Tailored": Structured waist/shoulder definition.
+CRITICAL ACCURACY GUIDELINES:
+1. Category & Subcategory:
+   - "T-Shirt": Crewneck/V-neck casual knit tee without full collar and buttons.
+   - "Shirt": Button-down front, collar, cuffs, woven dress or casual shirt.
+   - "Polo": Collared knit shirt with 2-3 button placket.
+   - "Kurta": Indian ethnic tunic/kurta.
+   - "Overshirt": Heavy structured shirt jacket / shacket.
+   - "Jeans": Denim trousers with copper/metal rivets and pocket stitching.
+   - "Chinos": Flat-front cotton casual trousers.
+   - "Trousers" / "Formal Pants": Dress pants with pressed pleat/crease.
+   - "Sneakers": Athletic or minimal leather trainers.
+   - "Loafers": Slip-on leather shoes (penny, tassel, bit).
+   - "Kolhapuris": Handcrafted Indian leather chappals.
+2. Color Detection: Accurately identify the true dominant base hue (e.g. Navy Blue, Sky Blue, Olive Green, Charcoal Grey, White, Black, Beige / Cream, Burgundy / Maroon).
+3. Do NOT hallucinate exotic fabrics if not clearly visible; choose "Cotton" for standard tees/shirts, "Denim" for jeans, "Leather" for dress shoes, or "Unknown / Not visible" when unsure.
+4. "name": Formulate a concise, elegant luxury title (e.g. "Sky Blue Cotton Oxford Shirt", "Charcoal Tailored Trousers", "Navy Minimal Leather Sneakers", "Olive Green Relaxed Overshirt").
 
-3. COLOR & MATERIAL:
-   - Identify the exact primary color (e.g. "Sky Blue", "Navy Blue", "Olive Green", "Charcoal Grey", "Sand Beige", "Crisp White", "Dark Indigo", "Burgundy", "Terracotta", "Forest Green", "Off-White", "Black").
-   - Secondary accent colors if present.
-   - Detect fabric material: "100% Cotton", "Pure Linen", "Raw Denim", "Merino Wool", "Full Grain Leather", "Cotton Twill", "Linen Blend", "Silk", "Knit Cotton", etc.
-
-Return ONLY strict, valid JSON with NO markdown formatting, matching this exact JSON schema:
+Return ONLY valid JSON matching this exact structure:
 {
   "category": "tops" | "bottoms" | "layers" | "footwear" | "accessories",
-  "subcategory": "shirt" | "t-shirt" | "polo" | "overshirt" | "kurta" | "jeans" | "chinos" | "trousers" | "shorts" | "track_pants" | "jacket" | "hoodie" | "sweater" | "sneakers" | "loafers" | "formal_shoes" | "sandals" | "kolhapuris" | "watch" | "belt" | "sunglasses",
-  "name": "Concise Descriptive Title (e.g. Olive Green Relaxed Overshirt, Sky Blue Linen Button-Down, Dark Indigo Straight Jeans)",
-  "primary_color": "Exact Color Name (e.g. Olive Green, Sky Blue, Charcoal, Sand Beige, Crisp White)",
+  "subcategory": "Exact match from category list above",
+  "name": "Concise Descriptive Title",
+  "primary_color": "Exact match from primary colors list",
   "secondary_colors": ["optional secondary colors"],
-  "pattern": "Solid" | "Striped" | "Checked" | "Textured" | "Printed" | "Graphic",
-  "material": "Cotton" | "Pure Linen" | "Denim" | "Wool" | "Full Grain Leather" | "Cotton Twill",
-  "fit": "Regular" | "Slim" | "Relaxed" | "Oversized" | "Tailored",
-  "style": "Smart Casual" | "Minimal" | "Modern Indian" | "Casual" | "Streetwear" | "Formal",
+  "pattern": "Solid" | "Striped" | "Checked" | "Textured / Self-Pattern" | "Printed / Floral" | "Graphic" | "Colorblock",
+  "material": "Exact match from fabric list",
+  "fit": "Regular" | "Slim" | "Relaxed" | "Oversized" | "Tailored" | "Not Applicable",
+  "style": "Smart Casual" | "Minimal" | "Modern Indian" | "Casual" | "Streetwear" | "Formal" | "Sporty",
   "formality": "Casual" | "Smart Casual" | "Semi-Formal" | "Formal" | "Festive",
-  "season": ["Summer", "All-Season", "Winter", "Monsoon"]
+  "season": ["All-Season", "Summer"]
 }
 `;
 
@@ -98,7 +114,7 @@ Return ONLY strict, valid JSON with NO markdown formatting, matching this exact 
         });
       } else {
         parts.push({
-          text: `Garment metadata or filename hint: ${hintName || 'Real wardrobe clothing item'}. Analyze appropriate attributes.`,
+          text: `Garment hint or filename: ${hintName || 'Wardrobe piece'}. Analyze appropriate attributes.`,
         });
       }
 
@@ -123,18 +139,59 @@ Return ONLY strict, valid JSON with NO markdown formatting, matching this exact 
         if (contentText) {
           const parsed = JSON.parse(contentText.replace(/```json\n?|\n?```/g, '').trim());
           if (parsed.category && parsed.name) {
+            const rawCat = String(parsed.category).toLowerCase().trim() as MainCategory;
+            const validCat: MainCategory = ['tops', 'bottoms', 'layers', 'footwear', 'accessories'].includes(rawCat)
+              ? rawCat
+              : 'tops';
+
+            // Validate subcategory against category
+            const validSubcategories = SUBCATEGORIES_BY_CATEGORY[validCat] || SUBCATEGORIES_BY_CATEGORY.tops;
+            let subcategory = parsed.subcategory || validSubcategories[0];
+            const matchedSub = validSubcategories.find(
+              (s) => s.toLowerCase() === String(subcategory).toLowerCase().replace(/[_-]/g, ' ')
+            );
+            if (matchedSub) {
+              subcategory = matchedSub;
+            } else if (!validSubcategories.includes(subcategory)) {
+              subcategory = validSubcategories[0];
+            }
+
+            // Validate primary color
+            let primaryColor = parsed.primary_color || 'Black';
+            const matchedColor = PRIMARY_COLOR_OPTIONS.find(
+              (c) => c.toLowerCase() === String(primaryColor).toLowerCase()
+            );
+            if (matchedColor) {
+              primaryColor = matchedColor;
+            }
+
+            // Validate material
+            let material = parsed.material || 'Cotton';
+            const matchedMat = FABRIC_OPTIONS.find(
+              (m) => m.toLowerCase() === String(material).toLowerCase()
+            );
+            if (matchedMat) {
+              material = matchedMat;
+            }
+
+            // Validate fit
+            let fit = parsed.fit || 'Regular';
+            if (!FIT_OPTIONS.includes(fit)) {
+              fit = validCat === 'accessories' || validCat === 'footwear' ? 'Not Applicable' : 'Regular';
+            }
+
             return {
-              category: parsed.category.toLowerCase() as MainCategory,
-              subcategory: parsed.subcategory || 'shirt',
+              category: validCat,
+              subcategory,
               name: parsed.name,
-              primary_color: parsed.primary_color || 'Neutral',
-              secondary_colors: parsed.secondary_colors || [],
-              pattern: parsed.pattern || 'Solid',
-              material: parsed.material || '100% Cotton',
-              fit: parsed.fit || 'Regular',
-              style: parsed.style || 'Smart Casual',
-              formality: parsed.formality || 'Smart Casual',
-              season: parsed.season || ['All-Season'],
+              primary_color: primaryColor,
+              secondary_colors: Array.isArray(parsed.secondary_colors) ? parsed.secondary_colors : [],
+              pattern: PATTERN_OPTIONS.includes(parsed.pattern) ? parsed.pattern : 'Solid',
+              material,
+              fit,
+              style: STYLE_OPTIONS.includes(parsed.style) ? parsed.style : 'Smart Casual',
+              formality: FORMALITY_OPTIONS.includes(parsed.formality) ? parsed.formality : 'Smart Casual',
+              season: Array.isArray(parsed.season) && parsed.season.length > 0 ? parsed.season : ['All-Season'],
             };
           }
         }
@@ -158,13 +215,13 @@ function fallbackHeuristicClassifier(imageData: string, hintName?: string): AICl
 
     return {
       category: 'footwear',
-      subcategory: isSneaker ? 'sneakers' : isLoafer ? 'loafers' : isKolhapuri ? 'kolhapuris' : 'formal_shoes',
-      name: isSneaker ? 'Minimalist White Leather Sneakers' : isLoafer ? 'Dark Brown Leather Loafers' : isKolhapuri ? 'Tan Handcrafted Kolhapuri Slippers' : 'Classic Dress Shoes',
-      primary_color: isSneaker ? 'White' : isLoafer ? 'Dark Brown' : isKolhapuri ? 'Tan' : 'Black',
-      secondary_colors: isSneaker ? ['Off-White'] : [],
+      subcategory: isSneaker ? 'Sneakers' : isLoafer ? 'Loafers' : isKolhapuri ? 'Kolhapuris' : 'Formal Shoes',
+      name: isSneaker ? 'Minimalist White Sneakers' : isLoafer ? 'Dark Brown Leather Loafers' : isKolhapuri ? 'Tan Handcrafted Kolhapuris' : 'Classic Formal Shoes',
+      primary_color: isSneaker ? 'White' : isLoafer ? 'Brown / Tan' : isKolhapuri ? 'Brown / Tan' : 'Black',
+      secondary_colors: isSneaker ? ['Light Grey'] : [],
       pattern: 'Solid',
-      material: 'Full Grain Leather',
-      fit: 'Regular',
+      material: 'Leather',
+      fit: 'Not Applicable',
       style: isKolhapuri ? 'Modern Indian' : 'Smart Casual',
       formality: isSneaker ? 'Smart Casual' : isLoafer ? 'Semi-Formal' : isKolhapuri ? 'Smart Casual' : 'Formal',
       season: ['All-Season', 'Summer'],
@@ -174,15 +231,16 @@ function fallbackHeuristicClassifier(imageData: string, hintName?: string): AICl
   if (query.includes('jean') || query.includes('denim') || query.includes('pant') || query.includes('trouser') || query.includes('chino') || query.includes('short')) {
     const isJeans = query.includes('jean') || query.includes('denim') || query.includes('indigo');
     const isChinos = query.includes('chino') || query.includes('beige') || query.includes('khaki');
+    const isShorts = query.includes('short');
 
     return {
       category: 'bottoms',
-      subcategory: isJeans ? 'jeans' : isChinos ? 'chinos' : 'trousers',
-      name: isJeans ? 'Raw Indigo Straight-Fit Jeans' : isChinos ? 'Beige Pleated Chinos' : 'Charcoal Tailored Trousers',
-      primary_color: isJeans ? 'Dark Indigo' : isChinos ? 'Beige' : 'Charcoal',
+      subcategory: isShorts ? 'Shorts' : isJeans ? 'Jeans' : isChinos ? 'Chinos' : 'Trousers',
+      name: isShorts ? 'Casual Cotton Shorts' : isJeans ? 'Dark Indigo Straight Jeans' : isChinos ? 'Beige Cotton Chinos' : 'Charcoal Tailored Trousers',
+      primary_color: isShorts ? 'Beige / Cream' : isJeans ? 'Navy Blue' : isChinos ? 'Beige / Cream' : 'Charcoal Grey',
       secondary_colors: [],
-      pattern: isJeans ? 'Solid Denim' : 'Solid',
-      material: isJeans ? 'Raw Denim Cotton' : isChinos ? 'Cotton Gabardine' : 'Tropical Wool Blend',
+      pattern: 'Solid',
+      material: isJeans ? 'Denim' : isChinos ? 'Cotton Twill' : 'Cotton',
       fit: 'Regular',
       style: isJeans ? 'Casual' : 'Smart Casual',
       formality: isJeans ? 'Casual' : isChinos ? 'Smart Casual' : 'Semi-Formal',
@@ -192,18 +250,21 @@ function fallbackHeuristicClassifier(imageData: string, hintName?: string): AICl
 
   if (query.includes('jacket') || query.includes('bomber') || query.includes('sweater') || query.includes('hoodie') || query.includes('blazer') || query.includes('coat')) {
     const isSweater = query.includes('sweater') || query.includes('knit');
+    const isBlazer = query.includes('blazer');
+    const isHoodie = query.includes('hoodie');
+
     return {
       category: 'layers',
-      subcategory: isSweater ? 'sweater' : 'jacket',
-      name: isSweater ? 'Heather Grey Fine Knit Sweater' : 'Midnight Navy Bomber Jacket',
-      primary_color: isSweater ? 'Grey' : 'Navy Blue',
+      subcategory: isSweater ? 'Sweater' : isBlazer ? 'Blazer' : isHoodie ? 'Hoodie' : 'Jacket',
+      name: isSweater ? 'Grey Fine Knit Sweater' : isBlazer ? 'Navy Tailored Blazer' : 'Midnight Bomber Jacket',
+      primary_color: isSweater ? 'Light Grey' : 'Navy Blue',
       secondary_colors: [],
-      pattern: isSweater ? 'Textured' : 'Solid',
-      material: isSweater ? 'Merino Wool Blend' : 'Lightweight Poly-Cotton',
+      pattern: isSweater ? 'Textured / Self-Pattern' : 'Solid',
+      material: isSweater ? 'Wool / Cashmere' : 'Cotton Twill',
       fit: 'Regular',
-      style: 'Smart Casual',
-      formality: 'Smart Casual',
-      season: ['Winter', 'Evening'],
+      style: isBlazer ? 'Formal' : 'Smart Casual',
+      formality: isBlazer ? 'Formal' : 'Smart Casual',
+      season: ['Winter', 'Monsoon'],
     };
   }
 
@@ -212,13 +273,13 @@ function fallbackHeuristicClassifier(imageData: string, hintName?: string): AICl
     const isBelt = query.includes('belt') || query.includes('leather');
     return {
       category: 'accessories',
-      subcategory: isWatch ? 'watch' : isBelt ? 'belt' : 'sunglasses',
-      name: isWatch ? 'Obsidian Minimalist Analog Watch' : isBelt ? 'Cognac Full-Grain Leather Belt' : 'Matte Black Classic Sunglasses',
-      primary_color: isWatch ? 'Black' : isBelt ? 'Cognac Brown' : 'Black',
-      secondary_colors: isWatch ? ['Silver'] : [],
+      subcategory: isWatch ? 'Watch' : isBelt ? 'Belt' : 'Sunglasses',
+      name: isWatch ? 'Minimalist Analog Watch' : isBelt ? 'Brown Leather Belt' : 'Classic Sunglasses',
+      primary_color: isWatch ? 'Black' : isBelt ? 'Brown / Tan' : 'Black',
+      secondary_colors: isWatch ? ['Light Grey'] : [],
       pattern: 'Solid',
-      material: isWatch ? 'Stainless Steel & Leather' : isBelt ? 'Full-Grain Leather' : 'Acetate',
-      fit: 'Standard',
+      material: isWatch ? 'Other' : isBelt ? 'Leather' : 'Other',
+      fit: 'Not Applicable',
       style: 'Minimal',
       formality: 'Smart Casual',
       season: ['All-Season'],
@@ -234,12 +295,12 @@ function fallbackHeuristicClassifier(imageData: string, hintName?: string): AICl
 
   return {
     category: 'tops',
-    subcategory: isKurta ? 'kurta' : isPolo ? 'polo' : isTee ? 't-shirt' : 'shirt',
-    name: isKurta ? 'Sand Modern Kurta Shirt' : isPolo ? 'Charcoal Pique Polo' : isTee ? 'Classic Navy Heavyweight T-Shirt' : isBlue ? 'Sky Blue Oxford Button-Down' : isOlive ? 'Olive Green Structured Overshirt' : 'Crisp White Linen Shirt',
-    primary_color: isKurta ? 'Sand Beige' : isPolo ? 'Charcoal' : isTee ? 'Navy Blue' : isBlue ? 'Sky Blue' : isOlive ? 'Olive Green' : 'White',
-    secondary_colors: isBlue ? ['Navy'] : [],
-    pattern: isOlive ? 'Textured' : 'Solid',
-    material: isKurta ? 'Linen Blend' : isBlue ? '100% Cotton Oxford' : 'Pure Linen',
+    subcategory: isKurta ? 'Kurta' : isPolo ? 'Polo' : isTee ? 'T-Shirt' : 'Shirt',
+    name: isKurta ? 'Modern Linen Kurta' : isPolo ? 'Charcoal Pique Polo' : isTee ? 'Navy Heavyweight T-Shirt' : isBlue ? 'Sky Blue Oxford Shirt' : isOlive ? 'Olive Green Overshirt' : 'White Linen Shirt',
+    primary_color: isKurta ? 'Beige / Cream' : isPolo ? 'Charcoal Grey' : isTee ? 'Navy Blue' : isBlue ? 'Sky Blue' : isOlive ? 'Olive Green' : 'White',
+    secondary_colors: isBlue ? ['Navy Blue'] : [],
+    pattern: isOlive ? 'Textured / Self-Pattern' : 'Solid',
+    material: isKurta ? 'Linen' : 'Cotton',
     fit: 'Regular',
     style: isKurta ? 'Modern Indian' : 'Smart Casual',
     formality: isKurta ? 'Smart Casual' : isTee ? 'Casual' : 'Smart Casual',

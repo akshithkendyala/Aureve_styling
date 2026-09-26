@@ -1,0 +1,171 @@
+import { MainCategory } from '@/lib/types';
+
+export const MAIN_CATEGORIES: { value: MainCategory; label: string }[] = [
+  { value: 'tops', label: 'Tops (Shirts / Tees / Kurtas)' },
+  { value: 'bottoms', label: 'Bottoms (Pants / Jeans / Chinos)' },
+  { value: 'layers', label: 'Layers (Jackets / Sweaters / Blazers)' },
+  { value: 'footwear', label: 'Footwear (Shoes / Loafers / Sneakers)' },
+  { value: 'accessories', label: 'Accessories (Watches / Belts / Glasses)' },
+];
+
+export const SUBCATEGORIES_BY_CATEGORY: Record<MainCategory, string[]> = {
+  tops: [
+    'T-Shirt',
+    'Shirt',
+    'Polo',
+    'Kurta',
+    'Overshirt',
+    'Henley',
+    'Tank Top',
+    'Sweatshirt',
+    'Hoodie',
+    'Other',
+  ],
+  bottoms: [
+    'Jeans',
+    'Chinos',
+    'Trousers',
+    'Formal Pants',
+    'Cargo Pants',
+    'Track Pants',
+    'Shorts',
+    'Joggers',
+    'Dhoti',
+    'Pajama',
+    'Other',
+  ],
+  layers: [
+    'Jacket',
+    'Blazer',
+    'Bomber Jacket',
+    'Denim Jacket',
+    'Windbreaker',
+    'Sweater',
+    'Cardigan',
+    'Hoodie',
+    'Coat',
+    'Overcoat',
+    'Other',
+  ],
+  footwear: [
+    'Sneakers',
+    'Running Shoes',
+    'Formal Shoes',
+    'Loafers',
+    'Boots',
+    'Sandals',
+    'Kolhapuris',
+    'Slippers',
+    'Flip-Flops',
+    'Sports Shoes',
+    'Other',
+  ],
+  accessories: [
+    'Watch',
+    'Belt',
+    'Sunglasses',
+    'Cap',
+    'Hat',
+    'Wallet',
+    'Bag',
+    'Bracelet',
+    'Ring',
+    'Tie',
+    'Pocket Square',
+    'Scarf',
+    'Other',
+  ],
+};
+
+export const FABRIC_OPTIONS: string[] = [
+  'Cotton',
+  'Linen',
+  'Denim',
+  'Cotton Twill',
+  'Wool / Cashmere',
+  'Silk',
+  'Satin',
+  'Polyester / Synthetic',
+  'Nylon',
+  'Rayon / Viscose',
+  'Modal',
+  'Velvet',
+  'Corduroy',
+  'Fleece',
+  'Leather',
+  'Suede',
+  'Jersey / Knit',
+  'Terry / French Terry',
+  'Elastane / Spandex Blend',
+  'Blended Fabric',
+  'Other',
+  'Unknown / Not visible',
+];
+
+export const PRIMARY_COLOR_OPTIONS: string[] = [
+  'Black',
+  'White',
+  'Navy Blue',
+  'Charcoal Grey',
+  'Light Grey',
+  'Beige / Cream',
+  'Olive Green',
+  'Sage Green',
+  'Dark Green',
+  'Brown / Tan',
+  'Burgundy / Maroon',
+  'Terracotta / Rust',
+  'Sky Blue',
+  'Royal Blue',
+  'Yellow / Mustard',
+  'Pink / Rose',
+  'Red',
+  'Purple / Lavender',
+  'Orange',
+  'Multicolor',
+];
+
+export const FIT_OPTIONS: string[] = [
+  'Regular',
+  'Slim',
+  'Relaxed',
+  'Oversized',
+  'Tailored',
+  'Not Applicable',
+];
+
+export const PATTERN_OPTIONS: string[] = [
+  'Solid',
+  'Striped',
+  'Checked',
+  'Textured / Self-Pattern',
+  'Printed / Floral',
+  'Graphic',
+  'Colorblock',
+];
+
+export const FORMALITY_OPTIONS: ('Casual' | 'Smart Casual' | 'Semi-Formal' | 'Formal' | 'Festive')[] = [
+  'Casual',
+  'Smart Casual',
+  'Semi-Formal',
+  'Formal',
+  'Festive',
+];
+
+export const STYLE_OPTIONS: string[] = [
+  'Smart Casual',
+  'Minimal',
+  'Modern Indian',
+  'Casual',
+  'Streetwear',
+  'Formal',
+  'Sporty',
+];
+
+export const SEASON_OPTIONS: string[] = [
+  'Summer',
+  'Monsoon',
+  'Winter',
+  'All-Season',
+  'Festive',
+];
