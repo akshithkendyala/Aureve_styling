@@ -127,8 +127,10 @@ Return ONLY valid JSON matching this exact structure:
         });
       }
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+      const modelName = process.env.GEMINI_VISION_MODEL || process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+
+      let response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -141,6 +143,24 @@ Return ONLY valid JSON matching this exact structure:
           }),
         }
       );
+
+      // Seamless fallback to gemini-2.5-flash if 3.8-flash is busy
+      if (!response.ok && modelName === 'gemini-3.8-flash') {
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts }],
+              generationConfig: {
+                responseMimeType: 'application/json',
+                temperature: 0.1,
+              },
+            }),
+          }
+        );
+      }
 
       if (response.ok) {
         const data = await response.json();
