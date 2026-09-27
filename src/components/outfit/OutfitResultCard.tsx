@@ -34,11 +34,16 @@ export function OutfitResultCard({
           <div>
             <div className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-widest text-[#7E6047] mb-1">
               <span className="w-2 h-2 rounded-full bg-[#18181B]" />
-              <span>YOUR LOOK • {outfit.occasion}</span>
+              <span>YOUR LOOK • {outfit.interpreted_occasion || outfit.occasion}</span>
             </div>
             <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-semibold text-[#18181B] tracking-tight">
               {outfit.title}
             </h2>
+            {outfit.custom_occasion_text && (
+              <p className="text-xs text-[#7E6047] italic mt-1 font-medium">
+                &ldquo;{outfit.custom_occasion_text}&rdquo;
+              </p>
+            )}
           </div>
 
           {/* Style Match Compatibility Badge */}

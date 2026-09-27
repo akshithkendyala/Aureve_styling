@@ -875,6 +875,8 @@ export const Repository = {
           .insert({
             user_id: userId,
             occasion: outfitData.occasion,
+            custom_occasion_text: outfitData.custom_occasion_text || null,
+            interpreted_occasion: outfitData.interpreted_occasion || null,
             date: outfitData.date,
             time: outfitData.time,
             location: outfitData.location,
@@ -944,6 +946,8 @@ export const Repository = {
             id: row.id,
             user_id: row.user_id,
             occasion: row.occasion,
+            custom_occasion_text: row.custom_occasion_text,
+            interpreted_occasion: row.interpreted_occasion,
             date: row.date,
             time: row.time,
             location: row.location,

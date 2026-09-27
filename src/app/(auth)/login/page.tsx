@@ -1,12 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Lock, Smartphone, User, ArrowRight, ShieldCheck, AlertCircle, Sparkles } from 'lucide-react';
+import { Lock, Smartphone, User, ArrowRight, ShieldCheck, AlertCircle, Sparkles, Clock } from 'lucide-react';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isTimeout = searchParams.get('timeout') === 'true';
+
   const [isRegistering, setIsRegistering] = useState(false);
   const [name, setName] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
@@ -135,6 +138,13 @@ export default function LoginPage() {
 
         {/* Card Box */}
         <div className="bg-white rounded-3xl border border-[#EBE5DB] shadow-xl p-6 sm:p-8 space-y-6">
+          {isTimeout && (
+            <div className="p-3.5 bg-[#F4EFEA] border border-[#E8DFD5] rounded-2xl text-xs text-[#5E4633] flex items-start space-x-2.5 animate-in fade-in duration-200">
+              <Clock className="w-4 h-4 text-[#7E6047] flex-shrink-0 mt-0.5" />
+              <span>Your session expired after 2 hours of inactivity. Please sign in again.</span>
+            </div>
+          )}
+
           {error && (
             <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 flex items-start space-x-2 animate-in fade-in duration-200">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -262,5 +272,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <React.Suspense fallback={<div className="min-h-screen bg-[#FBF9F6]" />}>
+      <LoginForm />
+    </React.Suspense>
   );
 }

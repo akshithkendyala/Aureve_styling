@@ -9,6 +9,7 @@ import {
   MissingItemSuggestion,
   OutfitFeedback,
   LearnedStyleProfile,
+  CustomOccasionContext,
 } from '@/lib/types';
 import {
   OCCASION_RULES,
@@ -20,12 +21,17 @@ import {
   buildLearnedStyleProfile,
   calculateFeedbackScore,
 } from '@/lib/ai/personalStyleEngine';
+import {
+  interpretCustomOccasion,
+  buildCustomOccasionRule,
+} from '@/lib/ai/customOccasionEngine';
 
 export interface GenerateOutfitParams {
   userId: string;
   userProfile?: UserProfile | null;
   wardrobe: WardrobeItem[];
   occasion: OccasionType | string;
+  customOccasionText?: string;
   date: string;
   time?: string;
   location?: string;
@@ -536,6 +542,7 @@ export async function generateIntelligentOutfit(
     wardrobe,
     userProfile,
     occasion,
+    customOccasionText,
     date,
     time = '19:00',
     location = 'Mumbai',
@@ -551,8 +558,19 @@ export async function generateIntelligentOutfit(
     throw new Error('No active items found in your wardrobe. Please add your clothes first.');
   }
 
-  // Step 2: Retrieve Occasion Rule
-  const rule = getOccasionRule(occasion);
+  // Step 2: Retrieve or Synthesize Occasion Rule (Custom vs Predefined)
+  let rule: OccasionRule;
+  let customOccasionSaved: string | null = null;
+  let interpretedOccasionSaved: string | null = null;
+
+  if (customOccasionText && customOccasionText.trim().length > 0) {
+    const customContext = await interpretCustomOccasion(customOccasionText, occasion);
+    rule = buildCustomOccasionRule(customContext);
+    customOccasionSaved = customOccasionText.trim();
+    interpretedOccasionSaved = customContext.interpretedOccasionName;
+  } else {
+    rule = getOccasionRule(occasion);
+  }
 
   // Step 3: Hard Pre-Filtering based on Occasion Rules
   let validTops = activeItems.filter((i) => i.category === 'tops' && isItemPermittedForOccasion(i, 'tops', rule));
@@ -754,6 +772,8 @@ MANDATORY INSTRUCTIONS:
 
   return {
     occasion,
+    custom_occasion_text: customOccasionSaved,
+    interpreted_occasion: interpretedOccasionSaved,
     date,
     time,
     location,

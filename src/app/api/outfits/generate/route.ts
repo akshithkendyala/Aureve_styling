@@ -12,10 +12,17 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { occasion, date, time, location = 'Mumbai', specialMode = 'standard' } = body;
+    const {
+      occasion = 'Date',
+      customOccasionText,
+      date,
+      time,
+      location = 'Mumbai',
+      specialMode = 'standard',
+    } = body;
 
-    if (!occasion) {
-      return NextResponse.json({ error: 'Occasion is required to style an outfit.' }, { status: 400 });
+    if (!occasion && (!customOccasionText || customOccasionText.trim().length === 0)) {
+      return NextResponse.json({ error: 'Occasion or description is required to style an outfit.' }, { status: 400 });
     }
 
     // Retrieve user profile, active wardrobe, previous outfits, and user feedback
@@ -39,12 +46,13 @@ export async function POST(req: NextRequest) {
     // Fetch real-time weather for the designated location
     const weather = await fetchWeatherData(location || profile?.city || 'Mumbai');
 
-    // Run AI Occasion Intelligence & Styling Engine with continuous feedback learning
+    // Run AI Occasion Intelligence & Styling Engine with continuous feedback learning and custom occasion reasoning
     const outfitResult = await generateIntelligentOutfit({
       userId: session.userId,
       userProfile: profile,
       wardrobe,
       occasion,
+      customOccasionText,
       date: date || new Date().toISOString().split('T')[0],
       time: time || '19:00',
       location: location || profile?.city || 'Mumbai',

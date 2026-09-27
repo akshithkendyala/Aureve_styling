@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       occasion,
+      custom_occasion_text,
+      interpreted_occasion,
       date,
       time,
       location,
@@ -45,6 +47,8 @@ export async function POST(req: NextRequest) {
 
     const savedOutfit = await Repository.saveOutfit(session.userId, {
       occasion: occasion || 'Casual Outing',
+      custom_occasion_text: custom_occasion_text || null,
+      interpreted_occasion: interpreted_occasion || null,
       date: date || new Date().toISOString().split('T')[0],
       time: time || '19:00',
       location: location || 'Mumbai',

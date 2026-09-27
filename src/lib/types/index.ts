@@ -103,10 +103,25 @@ export interface MissingItemSuggestion {
   priority: 'essential' | 'recommended';
 }
 
+export interface CustomOccasionContext {
+  rawText: string;
+  interpretedOccasionName: string;
+  matchedBaseOccasion: string; // key from OCCASION_RULES (e.g. party, interview, dinner, college, etc.)
+  formality: 'Casual' | 'Smart Casual' | 'Semi-Formal' | 'Formal' | 'Festive';
+  environment?: 'Indoor' | 'Outdoor' | 'Rooftop' | 'Transit' | 'Gym' | 'General';
+  timeContext?: 'Morning' | 'Day' | 'Evening' | 'Night' | 'Any';
+  vibe?: string;
+  styleDirection: string[];
+  weatherRelevance?: boolean;
+  specialRequirements?: string[];
+}
+
 export interface Outfit {
   id: string;
   user_id: string;
   occasion: OccasionType | string;
+  custom_occasion_text?: string | null;
+  interpreted_occasion?: string | null;
   date: string;
   time?: string;
   location?: string;

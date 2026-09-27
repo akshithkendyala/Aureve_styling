@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Sparkles,
@@ -14,6 +14,9 @@ import {
   AlertCircle,
   Shirt,
   Check,
+  Mic,
+  MicOff,
+  X,
 } from 'lucide-react';
 import {
   OccasionType,
@@ -26,13 +29,20 @@ import { OutfitResultCard } from '@/components/outfit/OutfitResultCard';
 import { AlternativeLooks } from '@/components/outfit/AlternativeLooks';
 import { FeedbackModal } from '@/components/outfit/FeedbackModal';
 
-export default function CreateOutfitPage() {
+function CreateOutfitContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
   const [occasion, setOccasion] = useState<OccasionType>(
     (searchParams.get('occasion') as OccasionType) || 'Date'
   );
+  const [customOccasionText, setCustomOccasionText] = useState(
+    searchParams.get('custom') || ''
+  );
+  const [isListening, setIsListening] = useState(false);
+  const [speechError, setSpeechError] = useState('');
+  const recognitionRef = useRef<any>(null);
+
   const [date, setDate] = useState(
     searchParams.get('date') || new Date().toISOString().split('T')[0]
   );
@@ -67,10 +77,70 @@ export default function CreateOutfitPage() {
 
   const loadingMessages = [
     'Analyzing your active wardrobe…',
-    'Assessing Mumbai climate and Indian context…',
+    'Assessing climate, environment & Indian context…',
     'Synthesizing proportions, color harmony & fabric breathability…',
     'Curating your complete look…',
   ];
+
+  // Speech-to-Text Voice Handler
+  const startListening = () => {
+    setSpeechError('');
+    if (typeof window === 'undefined') return;
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechError('Voice recognition is not supported in this browser. Please type your description.');
+      return;
+    }
+
+    try {
+      if (isListening && recognitionRef.current) {
+        recognitionRef.current.stop();
+        setIsListening(false);
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-IN';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setSpeechError('');
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = Array.from(event.results)
+          .map((res: any) => res[0].transcript)
+          .join('');
+        setCustomOccasionText(transcript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          setSpeechError('Microphone permission denied. Please enable microphone access in your browser.');
+        } else if (event.error === 'no-speech') {
+          setSpeechError('No speech detected. Please tap the mic and try speaking again.');
+        } else {
+          setSpeechError('Voice recognition error. Please type your description.');
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error('Failed to start speech recognition:', err);
+      setSpeechError('Could not access microphone. Please type your description.');
+      setIsListening(false);
+    }
+  };
 
   // Fetch weather when city changes
   useEffect(() => {
@@ -90,7 +160,7 @@ export default function CreateOutfitPage() {
 
   // If occasion passed via query param, auto-generate outfit
   useEffect(() => {
-    if (searchParams.get('occasion')) {
+    if (searchParams.get('occasion') || searchParams.get('custom')) {
       handleGenerate();
     }
   }, []);
@@ -113,6 +183,7 @@ export default function CreateOutfitPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           occasion,
+          customOccasionText: customOccasionText.trim() || undefined,
           date,
           time,
           location: city,
@@ -155,6 +226,8 @@ export default function CreateOutfitPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           occasion: outfitToSave.occasion,
+          custom_occasion_text: outfitToSave.custom_occasion_text,
+          interpreted_occasion: outfitToSave.interpreted_occasion,
           date: outfitToSave.date,
           time: outfitToSave.time,
           location: outfitToSave.location,
@@ -283,6 +356,83 @@ export default function CreateOutfitPage() {
           </div>
         </div>
 
+        {/* Divider / OR indicator */}
+        <div className="relative flex py-1 items-center">
+          <div className="flex-grow border-t border-[#EBE5DB]"></div>
+          <span className="flex-shrink mx-4 text-[10px] font-bold uppercase tracking-widest text-[#9A7B5F]">
+            OR
+          </span>
+          <div className="flex-grow border-t border-[#EBE5DB]"></div>
+        </div>
+
+        {/* Custom Occasion Description & Voice Input */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#7E6047]">
+              Describe Your Occasion
+            </label>
+            {isListening && (
+              <span className="inline-flex items-center space-x-1.5 text-[11px] font-medium text-[#7E6047] animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                <span>Listening… speak now</span>
+              </span>
+            )}
+          </div>
+
+          <div className="relative">
+            <textarea
+              rows={2}
+              maxLength={300}
+              value={customOccasionText}
+              onChange={(e) => setCustomOccasionText(e.target.value)}
+              placeholder="e.g. Farewell party at college outdoors, dinner with manager at a nice restaurant, or rooftop party..."
+              className="w-full px-4 py-3 pr-20 bg-[#FAF8F5] border border-[#EBE5DB] rounded-2xl text-xs sm:text-sm font-medium text-[#18181B] placeholder-[#9A7B5F]/60 focus:outline-none focus:border-[#18181B] transition-colors resize-none"
+            />
+            <div className="absolute right-3 top-3 flex items-center space-x-1.5">
+              {customOccasionText && (
+                <button
+                  type="button"
+                  onClick={() => setCustomOccasionText('')}
+                  title="Clear description"
+                  className="p-1.5 rounded-full text-[#9A7B5F] hover:text-[#18181B] hover:bg-[#EBE5DB]/50 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={startListening}
+                title={isListening ? 'Stop recording' : 'Speak your occasion'}
+                className={`p-2 rounded-full transition-all flex items-center justify-center ${
+                  isListening
+                    ? 'bg-red-500 text-white shadow-md animate-pulse'
+                    : 'bg-white border border-[#EBE5DB] text-[#5E4633] hover:text-[#18181B] hover:border-[#18181B] shadow-xs'
+                }`}
+              >
+                {isListening ? (
+                  <MicOff className="w-4 h-4" />
+                ) : (
+                  <Mic className="w-4 h-4 text-[#7E6047]" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] text-[#9A7B5F]">
+            <p>
+              Describe where you&apos;re going, what you&apos;re doing, the vibe, or how you want to dress.
+            </p>
+            <span>{customOccasionText.length}/300</span>
+          </div>
+
+          {speechError && (
+            <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl flex items-center space-x-1.5">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>{speechError}</span>
+            </p>
+          )}
+        </div>
+
         {/* Date, Time & City */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
           <div>
@@ -395,5 +545,13 @@ export default function CreateOutfitPage() {
         onClose={() => setIsFeedbackOpen(false)}
       />
     </div>
+  );
+}
+
+export default function CreateOutfitPage() {
+  return (
+    <React.Suspense fallback={<div className="p-8 text-center text-xs text-[#7E6047]">Loading AI Styling Studio…</div>}>
+      <CreateOutfitContent />
+    </React.Suspense>
   );
 }

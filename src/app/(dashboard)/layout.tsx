@@ -7,6 +7,8 @@ import { MobileNav } from '@/components/layout/MobileNav';
 import { AddClothingModal } from '@/components/wardrobe/AddClothingModal';
 import { WardrobeItem } from '@/lib/types';
 
+import { SessionTimeoutManager } from '@/components/auth/SessionTimeoutManager';
+
 export default function DashboardLayout({
   children,
 }: {
@@ -74,6 +76,9 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-[#FBF9F6] flex flex-col selection:bg-[#221A13] selection:text-[#FAF8F5]">
+      {/* 2-Hour Inactivity Session Timeout Manager */}
+      <SessionTimeoutManager />
+
       {/* Top Header */}
       <Header
         user={user}
