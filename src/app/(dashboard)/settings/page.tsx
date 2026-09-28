@@ -4,24 +4,20 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ShieldCheck,
-  Lock,
-  RefreshCw,
   Trash2,
   Download,
   LogOut,
   User,
   Check,
-  AlertCircle,
+  Mail,
+  Smartphone,
   Database,
 } from 'lucide-react';
+import { formatMobileDisplay } from '@/lib/auth/mobile';
 
 export default function SettingsPage() {
   const router = useRouter();
   const [user, setUser] = useState<any | null>(null);
-  const [newPin, setNewPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
-  const [pinMessage, setPinMessage] = useState('');
-  const [pinError, setPinError] = useState('');
   const [isResetting, setIsResetting] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
 
@@ -40,21 +36,12 @@ export default function SettingsPage() {
     loadMe();
   }, []);
 
-  const handleSeedWardrobe = async () => {
-    try {
-      const res = await fetch('/api/wardrobe/seed', { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        setActionMessage(data.message || 'Starter wardrobe added.');
-        setTimeout(() => setActionMessage(''), 3000);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   const handleClearWardrobe = async () => {
-    if (!confirm('Are you sure you want to completely empty your wardrobe? All clothes and saved outfits will be removed.')) {
+    if (
+      !confirm(
+        'Are you sure you want to completely empty your wardrobe? All clothes and saved outfits will be removed.'
+      )
+    ) {
       return;
     }
     setIsResetting(true);
@@ -106,7 +93,7 @@ export default function SettingsPage() {
           Settings & Privacy
         </h1>
         <p className="text-xs sm:text-sm text-[#7E6047] mt-1">
-          Manage your private security PIN, wardrobe data, and account preferences.
+          Manage your verified Google account, registered mobile number, wardrobe data, and account preferences.
         </p>
       </div>
 
@@ -126,18 +113,34 @@ export default function SettingsPage() {
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#EBE5DB]">
-            <span className="text-[10px] uppercase font-bold text-[#7E6047]">Account Name</span>
-            <p className="font-serif text-lg font-semibold text-[#18181B] mt-0.5">
+            <div className="flex items-center space-x-1.5 text-[10px] uppercase font-bold text-[#7E6047] mb-1">
+              <User className="w-3 h-3" />
+              <span>Full Name</span>
+            </div>
+            <p className="font-serif text-base font-semibold text-[#18181B]">
               {user?.name || 'Member'}
             </p>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#EBE5DB]">
-            <span className="text-[10px] uppercase font-bold text-[#7E6047]">Registered Mobile Number</span>
-            <p className="font-mono text-base font-semibold text-[#18181B] mt-0.5">
-              +91 {user?.mobile_number || '••••••••••'}
+            <div className="flex items-center space-x-1.5 text-[10px] uppercase font-bold text-[#7E6047] mb-1">
+              <Mail className="w-3 h-3" />
+              <span>Google Account</span>
+            </div>
+            <p className="font-mono text-xs font-semibold text-[#18181B] truncate" title={user?.email}>
+              {user?.email || 'Google Authenticated'}
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#EBE5DB]">
+            <div className="flex items-center space-x-1.5 text-[10px] uppercase font-bold text-[#7E6047] mb-1">
+              <Smartphone className="w-3 h-3" />
+              <span>Registered Mobile</span>
+            </div>
+            <p className="font-mono text-xs font-semibold text-[#18181B]">
+              {formatMobileDisplay(user?.mobile_number) || '+91 ••••• •••••'}
             </p>
           </div>
         </div>
@@ -154,7 +157,7 @@ export default function SettingsPage() {
 
         <div className="space-y-2 text-xs text-[#5E4633] leading-relaxed">
           <p>
-            Your wardrobe data is strictly isolated with database-level security policies (RLS). No other user or third party can view your photos, clothes, or outfit history.
+            Your wardrobe data is strictly isolated with database-level Row Level Security policies (RLS). No other user or third party can view your photos, clothes, or outfit history.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
             <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EBE5DB] flex items-center space-x-2">
@@ -163,7 +166,7 @@ export default function SettingsPage() {
             </div>
             <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EBE5DB] flex items-center space-x-2">
               <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-              <span>Bcrypt 6-Digit PIN Protection</span>
+              <span>Google OAuth 2.0 Authentication</span>
             </div>
           </div>
         </div>

@@ -8,8 +8,10 @@ import { Sparkles, Shirt, Compass, BookOpen, User, LogOut, Plus } from 'lucide-r
 interface HeaderProps {
   user?: {
     id: string;
+    email?: string;
     name: string;
-    mobile_number: string;
+    mobile_number?: string;
+    avatar_url?: string;
   } | null;
   onOpenAddModal?: () => void;
 }
@@ -100,8 +102,12 @@ export function Header({ user, onOpenAddModal }: HeaderProps) {
               title="View & Edit Style Profile"
               className="flex items-center space-x-2 p-1.5 sm:px-3 sm:py-1.5 rounded-full hover:bg-[#F4EFEA] text-[#18181B] transition-colors border border-transparent hover:border-[#E8DFD5] whitespace-nowrap group"
             >
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#E8DFD5] text-[#5E4633] flex items-center justify-center font-serif text-sm font-semibold border border-[#D6C7B7] flex-shrink-0 group-hover:border-[#9A7B5F] transition-colors">
-                {user?.name ? user.name[0].toUpperCase() : 'A'}
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#E8DFD5] text-[#5E4633] flex items-center justify-center font-serif text-sm font-semibold border border-[#D6C7B7] flex-shrink-0 group-hover:border-[#9A7B5F] transition-colors overflow-hidden">
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt={user.name || 'User'} className="w-full h-full object-cover" />
+                ) : (
+                  user?.name ? user.name[0].toUpperCase() : 'A'
+                )}
               </div>
               <span className="hidden sm:inline-block text-xs font-medium text-[#18181B] whitespace-nowrap group-hover:text-[#7E6047] transition-colors">
                 {user?.name || 'My Profile'}

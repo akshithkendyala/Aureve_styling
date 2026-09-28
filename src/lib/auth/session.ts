@@ -1,80 +1,38 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { User } from '@/lib/types';
+import { createClient } from '@/lib/supabase/server';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'aureve_default_secure_wardrobe_jwt_secret_2026_key_super_safe';
+const JWT_SECRET = process.env.JWT_SECRET || 'aureve_luxury_styling_assistant_jwt_secret_dev_key_987654321';
 const secretKey = new TextEncoder().encode(JWT_SECRET);
 const COOKIE_NAME = 'aureve_session';
 const SESSION_DURATION = 30 * 24 * 60 * 60; // 30 days in seconds
 
-// In-memory rate limiting map for login protection
-const loginAttempts = new Map<string, { count: number; firstAttempt: number }>();
-const MAX_ATTEMPTS = 5;
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
-
 export interface SessionPayload {
   userId: string;
-  mobile: string;
+  email: string;
   name: string;
+  mobile?: string;
+  avatarUrl?: string;
   exp?: number;
-}
-
-/**
- * Check if a mobile number is rate-limited due to repeated failed login attempts
- */
-export function checkRateLimit(mobile: string): { allowed: boolean; retryAfterMinutes?: number } {
-  const now = Date.now();
-  const attemptData = loginAttempts.get(mobile);
-
-  if (!attemptData) {
-    return { allowed: true };
-  }
-
-  if (now - attemptData.firstAttempt > RATE_LIMIT_WINDOW_MS) {
-    loginAttempts.delete(mobile);
-    return { allowed: true };
-  }
-
-  if (attemptData.count >= MAX_ATTEMPTS) {
-    const remainingMs = RATE_LIMIT_WINDOW_MS - (now - attemptData.firstAttempt);
-    return {
-      allowed: false,
-      retryAfterMinutes: Math.ceil(remainingMs / 60000),
-    };
-  }
-
-  return { allowed: true };
-}
-
-/**
- * Record a failed login attempt
- */
-export function recordFailedAttempt(mobile: string): void {
-  const now = Date.now();
-  const attemptData = loginAttempts.get(mobile);
-
-  if (!attemptData || now - attemptData.firstAttempt > RATE_LIMIT_WINDOW_MS) {
-    loginAttempts.set(mobile, { count: 1, firstAttempt: now });
-  } else {
-    attemptData.count += 1;
-  }
-}
-
-/**
- * Clear failed attempts after a successful login
- */
-export function clearFailedAttempts(mobile: string): void {
-  loginAttempts.delete(mobile);
 }
 
 /**
  * Create a signed JWT session token
  */
-export async function createSessionToken(user: User): Promise<string> {
+export async function createSessionToken(payload: {
+  userId: string;
+  email?: string;
+  name?: string;
+  mobile?: string;
+  avatarUrl?: string;
+}): Promise<string> {
   return new SignJWT({
-    userId: user.id,
-    mobile: user.mobile_number,
-    name: user.name,
+    userId: payload.userId,
+    email: payload.email || '',
+    name: payload.name || '',
+    mobile: payload.mobile || '',
+    avatarUrl: payload.avatarUrl || '',
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -86,22 +44,30 @@ export async function createSessionToken(user: User): Promise<string> {
  * Set the session cookie in response headers
  */
 export async function setSessionCookie(token: string): Promise<void> {
-  const cookieStore = cookies();
-  cookieStore.set(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: SESSION_DURATION,
-    path: '/',
-  });
+  try {
+    const cookieStore = cookies();
+    cookieStore.set(COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: SESSION_DURATION,
+      path: '/',
+    });
+  } catch (err) {
+    console.warn('setSessionCookie note:', err);
+  }
 }
 
 /**
  * Remove session cookie (Logout)
  */
 export async function removeSessionCookie(): Promise<void> {
-  const cookieStore = cookies();
-  cookieStore.delete(COOKIE_NAME);
+  try {
+    const cookieStore = cookies();
+    cookieStore.delete(COOKIE_NAME);
+  } catch (err) {
+    console.warn('removeSessionCookie note:', err);
+  }
 }
 
 /**
@@ -117,17 +83,44 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
 }
 
 /**
- * Get current authenticated user from request cookies
+ * Get current authenticated user from Supabase Auth session or backup cookie
  */
 export async function getSessionUser(): Promise<SessionPayload | null> {
   try {
+    // 1. Check official Supabase Auth user via SSR server client
+    const supabase = createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (!authError && user) {
+      return {
+        userId: user.id,
+        email: user.email || '',
+        name:
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.email?.split('@')[0] ||
+          'Member',
+        mobile: user.user_metadata?.mobile_number || '',
+        avatarUrl: user.user_metadata?.avatar_url || user.user_metadata?.picture || '',
+      };
+    }
+  } catch (err) {
+    // Fall back to cookie check if Supabase Auth check threw
+  }
+
+  // 2. Check fallback signed JWT cookie
+  try {
     const cookieStore = cookies();
     const sessionCookie = cookieStore.get(COOKIE_NAME);
-    if (!sessionCookie?.value) {
-      return null;
+    if (sessionCookie?.value) {
+      return await verifySessionToken(sessionCookie.value);
     }
-    return await verifySessionToken(sessionCookie.value);
   } catch {
-    return null;
+    // Ignore cookie read error
   }
+
+  return null;
 }

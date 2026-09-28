@@ -16,8 +16,10 @@ import {
   Ban,
   ShieldCheck,
   Check,
+  Phone,
 } from 'lucide-react';
 import { POPULAR_INDIAN_CITIES } from '@/lib/weather/weatherService';
+import { isValidIndianMobile, normalizeMobileNumber } from '@/lib/auth/mobile';
 
 const SKIN_TONES = [
   { label: 'Warm Olive', color: '#BCA07D' },
@@ -89,8 +91,10 @@ export default function OnboardingPage() {
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userName, setUserName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
 
-  // Step 1: Physical Profile & Location
+  // Step 1: Mobile & Physical Profile & Location
+  const [mobileNumber, setMobileNumber] = useState('');
   const [height, setHeight] = useState("5'10\"");
   const [weight, setWeight] = useState('72 kg');
   const [skinTone, setSkinTone] = useState('Warm Olive');
@@ -121,6 +125,7 @@ export default function OnboardingPage() {
         const data = await res.json();
         if (data.authenticated && data.user) {
           setUserName(data.user.name || '');
+          setUserEmail(data.user.email || '');
 
           // If user already completed onboarding, redirect straight to dashboard
           if (data.profile?.profile_completed === true) {
@@ -128,9 +133,18 @@ export default function OnboardingPage() {
             return;
           }
 
+          if (data.user.mobile_number) {
+            const rawDigits = data.user.mobile_number.replace(/\D/g, '');
+            setMobileNumber(rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits);
+          }
+
           // Populate existing fields if any
           if (data.profile) {
             const p = data.profile;
+            if (p.mobile_number) {
+              const rawDigits = p.mobile_number.replace(/\D/g, '');
+              setMobileNumber(rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits);
+            }
             if (p.height) setHeight(p.height);
             if (p.weight) setWeight(p.weight);
             if (p.skin_tone) setSkinTone(p.skin_tone);
@@ -149,6 +163,7 @@ export default function OnboardingPage() {
             if (savedDraft) {
               const draft = JSON.parse(savedDraft);
               if (draft.step) setCurrentStep(draft.step);
+              if (draft.mobileNumber) setMobileNumber(draft.mobileNumber);
               if (draft.height) setHeight(draft.height);
               if (draft.weight) setWeight(draft.weight);
               if (draft.skinTone) setSkinTone(draft.skinTone);
@@ -184,6 +199,7 @@ export default function OnboardingPage() {
         'aureve_onboarding_draft',
         JSON.stringify({
           step: stepNumber,
+          mobileNumber,
           height,
           weight,
           skinTone,
@@ -205,6 +221,10 @@ export default function OnboardingPage() {
     setStepError('');
 
     if (currentStep === 1) {
+      if (!mobileNumber || !isValidIndianMobile(mobileNumber)) {
+        setStepError('Mobile number is required. Please enter a valid 10-digit Indian mobile number.');
+        return;
+      }
       if (!height.trim()) {
         setStepError('Please provide your approximate height.');
         return;
@@ -285,11 +305,18 @@ export default function OnboardingPage() {
     setIsSaving(true);
     setStepError('');
 
+    if (!mobileNumber || !isValidIndianMobile(mobileNumber)) {
+      setStepError('Mobile number is required. Please return to Step 1 and provide a valid 10-digit Indian mobile number.');
+      setIsSaving(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          mobile_number: normalizeMobileNumber(mobileNumber),
           height: height.trim(),
           weight: weight.trim(),
           skin_tone: skinTone,
@@ -339,7 +366,7 @@ export default function OnboardingPage() {
   }
 
   const steps = [
-    { num: 1, title: 'About You', desc: 'Proportions & Fit' },
+    { num: 1, title: 'About You', desc: 'Contact & Proportions' },
     { num: 2, title: 'Your Style', desc: 'Palette & Aesthetics' },
     { num: 3, title: 'Lifestyle', desc: 'Occasions & Comfort' },
     { num: 4, title: 'Finish', desc: 'Start Styling' },
@@ -363,7 +390,7 @@ export default function OnboardingPage() {
           </p>
           {userName && (
             <p className="text-xs text-[#5E4633] pt-0.5">
-              Welcome, <strong className="font-semibold text-[#18181B]">{userName}</strong>. Let&apos;s calibrate your private styling preferences.
+              Welcome, <strong className="font-semibold text-[#18181B]">{userName}</strong> ({userEmail}). Let&apos;s calibrate your private styling preferences.
             </p>
           )}
         </div>
@@ -411,7 +438,7 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* STEP 1: ABOUT YOU (Proportions & Location) */}
+        {/* STEP 1: ABOUT YOU (Mobile, Proportions & Location) */}
         {currentStep === 1 && (
           <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6 shadow-md animate-in fade-in duration-300">
             <div className="border-b border-[#F4EFEA] pb-4 space-y-1">
@@ -420,10 +447,39 @@ export default function OnboardingPage() {
                 <span className="text-xs uppercase font-bold tracking-wider">Step 1 of 4</span>
               </div>
               <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[#18181B]">
-                Your Silhouette & Proportions
+                Your Contact & Proportions
               </h2>
               <p className="text-xs text-[#7E6047]">
-                AUREVÉ calculates fabric drape, layer balance, and regional climate context for your body.
+                AUREVÉ links your mobile number to your profile and calculates fabric drape, layer balance, and regional climate context.
+              </p>
+            </div>
+
+            {/* Mobile Number — REQUIRED */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B]">
+                  Mobile Number <span className="text-rose-600 font-bold">*</span>
+                </label>
+                <span className="text-[10px] font-medium text-[#7E6047]">
+                  Required for AUREVÉ profile
+                </span>
+              </div>
+              <div className="relative flex items-center">
+                <span className="absolute left-3.5 text-xs font-semibold text-[#7E6047] border-r border-[#D6C7B7] pr-2">
+                  +91
+                </span>
+                <input
+                  type="tel"
+                  maxLength={10}
+                  value={mobileNumber}
+                  onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                  required
+                  placeholder="98765 43210"
+                  className="w-full pl-16 pr-4 py-3 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] placeholder-[#9A7B5F]/60 focus:outline-none focus:border-[#18181B] transition-colors"
+                />
+              </div>
+              <p className="text-[10px] text-[#9A7B5F] mt-1">
+                Enter your 10-digit Indian mobile number. Used solely for your private profile and outfit alerts.
               </p>
             </div>
 
@@ -552,7 +608,7 @@ export default function OnboardingPage() {
                 <select
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B] transition-colors"
+                  className="w-full pl-10 pr-4 py-3 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
                 >
                   {POPULAR_INDIAN_CITIES.map((c) => (
                     <option key={c.name} value={c.name}>
@@ -565,7 +621,7 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* STEP 2: YOUR STYLE & COLOR HARMONY */}
+        {/* STEP 2: PALETTE & STYLE PERSONAS */}
         {currentStep === 2 && (
           <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6 shadow-md animate-in fade-in duration-300">
             <div className="border-b border-[#F4EFEA] pb-4 space-y-1">
@@ -574,92 +630,98 @@ export default function OnboardingPage() {
                 <span className="text-xs uppercase font-bold tracking-wider">Step 2 of 4</span>
               </div>
               <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[#18181B]">
-                Colors & Aesthetic Persona
+                Your Color Palette & Aesthetics
               </h2>
               <p className="text-xs text-[#7E6047]">
-                Select the tones and styles you gravitate towards when dressing.
+                Select the colors you love wearing and the style aesthetics you resonate with.
               </p>
             </div>
 
             {/* Favorite Colors */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047]">
-                  Favorite Colors (Prioritized in Outfit Assembly)
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#7E6047] flex items-center space-x-1.5">
+                  <Heart className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Favorite Colors (Select at least 1)</span>
                 </label>
-                <span className="text-[10px] text-[#9A7B5F] font-medium">
+                <span className="text-[11px] text-[#9A7B5F]">
                   {favoriteColors.length} selected
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
-                {POPULAR_COLORS.map((col) => {
-                  const active = favoriteColors.includes(col);
+                {POPULAR_COLORS.map((c) => {
+                  const isFav = favoriteColors.includes(c);
                   return (
                     <button
-                      key={col}
+                      key={c}
                       type="button"
-                      onClick={() => toggleFavoriteColor(col)}
+                      onClick={() => toggleFavoriteColor(c)}
                       className={`px-3.5 py-2 rounded-full text-xs font-medium transition-all flex items-center space-x-1.5 ${
-                        active
+                        isFav
                           ? 'bg-[#18181B] text-white shadow-xs'
-                          : 'bg-[#FAF8F5] border border-[#EBE5DB] text-[#5E4633] hover:border-[#18181B]'
+                          : 'bg-[#FAF8F5] text-[#5E4633] border border-[#EBE5DB] hover:border-[#18181B]'
                       }`}
                     >
-                      <Heart className={`w-3 h-3 ${active ? 'fill-white text-white' : 'text-[#9A7B5F]'}`} />
-                      <span>{col}</span>
+                      {isFav && <Check className="w-3 h-3" />}
+                      <span>{c}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Colors to Avoid */}
+            {/* Avoided Colors */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
-                Colors You Usually Avoid
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#7E6047] flex items-center space-x-1.5">
+                  <Ban className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Colors You Avoid</span>
+                </label>
+                <span className="text-[11px] text-[#9A7B5F]">
+                  {avoidedColors.length} selected
+                </span>
+              </div>
               <div className="flex flex-wrap gap-2">
-                {AVOID_COLORS.map((col) => {
-                  const active = avoidedColors.includes(col);
+                {AVOID_COLORS.map((c) => {
+                  const isAvoid = avoidedColors.includes(c);
                   return (
                     <button
-                      key={col}
+                      key={c}
                       type="button"
-                      onClick={() => toggleAvoidColor(col)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center space-x-1 ${
-                        active
-                          ? 'bg-rose-900 text-white shadow-xs'
-                          : 'bg-[#FAF8F5] border border-[#EBE5DB] text-[#5E4633] hover:border-[#18181B]'
+                      onClick={() => toggleAvoidColor(c)}
+                      className={`px-3.5 py-2 rounded-full text-xs font-medium transition-all ${
+                        isAvoid
+                          ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                          : 'bg-[#FAF8F5] text-[#5E4633] border border-[#EBE5DB] hover:border-[#18181B]'
                       }`}
                     >
-                      <Ban className="w-3 h-3" />
-                      <span>{col}</span>
+                      {c}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Preferred Styles */}
+            {/* Style Personas */}
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
-                Preferred Style Personas (Select all that apply)
+                Style Aesthetics You Love
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {STYLE_PERSONAS.map((style) => {
-                  const active = stylePrefs.includes(style);
+                {STYLE_PERSONAS.map((sp) => {
+                  const isSelected = stylePrefs.includes(sp);
                   return (
                     <button
-                      key={style}
+                      key={sp}
                       type="button"
-                      onClick={() => toggleStylePref(style)}
-                      className={`p-3 rounded-2xl border text-xs font-semibold text-center transition-all ${
-                        active
-                          ? 'bg-[#18181B] text-white border-[#18181B] shadow-xs'
-                          : 'bg-[#FAF8F5] border-[#EBE5DB] text-[#5E4633] hover:border-[#18181B]'
+                      onClick={() => toggleStylePref(sp)}
+                      className={`p-3.5 rounded-2xl border text-center transition-all ${
+                        isSelected
+                          ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
+                          : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
                       }`}
                     >
-                      {style}
+                      <span className="text-xs font-semibold">{sp}</span>
                     </button>
                   );
                 })}
@@ -677,82 +739,80 @@ export default function OnboardingPage() {
                 <span className="text-xs uppercase font-bold tracking-wider">Step 3 of 4</span>
               </div>
               <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[#18181B]">
-                Comfort & Typical Occasions
+                Your Lifestyle & Comfort
               </h2>
               <p className="text-xs text-[#7E6047]">
-                How you prefer garments to feel and where you spend your time.
+                AUREVÉ balances ease and elevation based on where you spend your days.
               </p>
             </div>
 
-            {/* Comfort Preference */}
+            {/* Typical Occasions */}
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
-                Comfort vs. Structure Balance
+                Typical Occasions (Select all that apply)
               </label>
-              <div className="space-y-2.5">
-                {[
-                  {
-                    val: 'Maximum Comfort',
-                    title: 'Maximum Comfort',
-                    desc: 'Breathable, soft, unrestrictive fabrics (linen, lightweight cotton, relaxed chinos).',
-                  },
-                  {
-                    val: 'Balanced',
-                    title: 'Balanced (Smart & Easy)',
-                    desc: 'Smart-casual elevation with ease of movement throughout the day.',
-                  },
-                  {
-                    val: 'Structure & Sharpness',
-                    title: 'Structure & Sharpness',
-                    desc: 'Crisp collars, tailored blazers, and clean architectural lines.',
-                  },
-                ].map((item) => {
-                  const isSelected = comfortPreference === item.val;
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {OCCASIONS.map((occ) => {
+                  const isSelected = typicalOccasions.includes(occ.label);
                   return (
                     <button
-                      key={item.val}
+                      key={occ.label}
                       type="button"
-                      onClick={() => setComfortPreference(item.val as any)}
-                      className={`w-full p-4 rounded-2xl border text-left transition-all ${
+                      onClick={() => toggleOccasion(occ.label)}
+                      className={`p-3.5 rounded-2xl border text-left transition-all flex items-center space-x-3 ${
                         isSelected
-                          ? 'border-[#18181B] bg-[#18181B] text-white shadow-xs'
+                          ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
                           : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="font-serif text-base font-semibold">{item.title}</span>
-                        {isSelected && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-                      </div>
-                      <p className={`text-xs ${isSelected ? 'text-[#FAF8F5]/80' : 'text-[#7E6047]'}`}>
-                        {item.desc}
-                      </p>
+                      <span className="text-lg">{occ.emoji}</span>
+                      <span className="text-xs font-semibold">{occ.label}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Typical Occasions */}
+            {/* Comfort vs Structure Preference */}
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
-                Typical Occasions in Your Week (Select all that apply)
+                Comfort vs Structure Balance
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {OCCASIONS.map((occ) => {
-                  const active = typicalOccasions.includes(occ.label);
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  {
+                    title: 'Maximum Comfort',
+                    desc: 'Breathable, relaxed fabrics with minimal stiffness',
+                  },
+                  {
+                    title: 'Balanced',
+                    desc: 'Smart equilibrium of easy movement and polished tailoring',
+                  },
+                  {
+                    title: 'Structure & Sharpness',
+                    desc: 'Crisp collars, tailored cuts, and sharp silhouettes',
+                  },
+                ].map((item) => {
+                  const isSelected = comfortPreference === item.title;
                   return (
                     <button
-                      key={occ.label}
+                      key={item.title}
                       type="button"
-                      onClick={() => toggleOccasion(occ.label)}
-                      className={`p-3 rounded-2xl border text-xs font-semibold transition-all flex items-center space-x-2 ${
-                        active
-                          ? 'bg-[#18181B] text-white border-[#18181B] shadow-xs'
-                          : 'bg-[#FAF8F5] border-[#EBE5DB] text-[#5E4633] hover:border-[#18181B]'
+                      onClick={() => setComfortPreference(item.title as any)}
+                      className={`p-4 rounded-2xl border text-left transition-all ${
+                        isSelected
+                          ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
+                          : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
                       }`}
                     >
-                      <span>{occ.emoji}</span>
-                      <span className="truncate">{occ.label}</span>
+                      <h4 className="font-serif text-sm font-semibold mb-1">{item.title}</h4>
+                      <p
+                        className={`text-[11px] ${
+                          isSelected ? 'text-[#FAF8F5]/80' : 'text-[#7E6047]'
+                        }`}
+                      >
+                        {item.desc}
+                      </p>
                     </button>
                   );
                 })}
@@ -764,97 +824,61 @@ export default function OnboardingPage() {
         {/* STEP 4: REVIEW & FINISH */}
         {currentStep === 4 && (
           <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6 shadow-md animate-in fade-in duration-300">
-            <div className="border-b border-[#F4EFEA] pb-4 space-y-1">
-              <div className="flex items-center space-x-2 text-[#7E6047]">
-                <Sparkles className="w-4 h-4 text-[#9A7B5F]" />
-                <span className="text-xs uppercase font-bold tracking-wider">Step 4 of 4</span>
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 bg-[#FAF8F5] border border-[#EBE5DB] rounded-full flex items-center justify-center mx-auto text-[#7E6047]">
+                <Sparkles className="w-6 h-6" />
               </div>
               <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[#18181B]">
-                Review Your Style Profile
+                Your Style Profile is Ready
               </h2>
-              <p className="text-xs text-[#7E6047]">
-                Your personal fashion identity is set. AUREVÉ is ready to style your wardrobe.
+              <p className="text-xs text-[#7E6047] max-w-md mx-auto">
+                AUREVÉ has mapped your proportions, aesthetics, and lifestyle to deliver outfit intelligence.
               </p>
             </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div className="p-4 bg-[#FAF8F5] rounded-2xl border border-[#EBE5DB] space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#7E6047] block">
-                  Silhouette & Proportions
-                </span>
-                <p className="font-medium text-[#18181B]">
-                  {height} • {weight} • {skinTone}
-                </p>
-                <p className="text-[#5E4633]">
-                  Fit Preference: <strong>{preferredFit} Fit</strong>
-                </p>
-                <p className="text-[#5E4633]">
-                  Location: <strong>{city}</strong>
-                </p>
+            {/* Profile Summary Card */}
+            <div className="p-5 rounded-2xl bg-[#FAF8F5] border border-[#EBE5DB] space-y-3.5 text-xs text-[#5E4633]">
+              <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-2">
+                <span className="font-semibold text-[#18181B]">Google Account</span>
+                <span className="font-mono text-[#7E6047]">{userEmail || 'Google Verified'}</span>
               </div>
-
-              <div className="p-4 bg-[#FAF8F5] rounded-2xl border border-[#EBE5DB] space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#7E6047] block">
-                  Style Personas
-                </span>
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {stylePrefs.map((s) => (
-                    <span key={s} className="px-2 py-0.5 bg-white border border-[#E8DFD5] rounded-full text-[10px] font-medium text-[#18181B]">
-                      {s}
-                    </span>
-                  ))}
-                </div>
+              <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-2">
+                <span className="font-semibold text-[#18181B]">Registered Mobile</span>
+                <span className="font-mono text-[#7E6047]">+91 {mobileNumber}</span>
               </div>
-
-              <div className="p-4 bg-[#FAF8F5] rounded-2xl border border-[#EBE5DB] space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#7E6047] block">
-                  Color Harmony
-                </span>
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {favoriteColors.map((c) => (
-                    <span key={c} className="px-2 py-0.5 bg-white border border-[#E8DFD5] rounded-full text-[10px] font-medium text-[#18181B]">
-                      {c}
-                    </span>
-                  ))}
-                </div>
+              <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-2">
+                <span className="font-semibold text-[#18181B]">Proportions & Fit</span>
+                <span>{height} • {weight} • {preferredFit} Fit</span>
               </div>
-
-              <div className="p-4 bg-[#FAF8F5] rounded-2xl border border-[#EBE5DB] space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#7E6047] block">
-                  Lifestyle & Occasions
-                </span>
-                <p className="text-[#5E4633] mb-1">
-                  Comfort: <strong>{comfortPreference}</strong>
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {typicalOccasions.map((o) => (
-                    <span key={o} className="px-2 py-0.5 bg-white border border-[#E8DFD5] rounded-full text-[10px] font-medium text-[#18181B]">
-                      {o}
-                    </span>
-                  ))}
-                </div>
+              <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-2">
+                <span className="font-semibold text-[#18181B]">Skin Undertone</span>
+                <span>{skinTone}</span>
               </div>
-            </div>
-
-            {/* Privacy Assurance Note */}
-            <div className="p-3.5 bg-[#F4EFEA] rounded-2xl border border-[#E8DFD5] flex items-center space-x-2 text-xs text-[#5E4633]">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-              <span>You can adjust your style profile anytime in Settings $\rightarrow$ My Style.</span>
+              <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-2">
+                <span className="font-semibold text-[#18181B]">Favorite Colors</span>
+                <span>{favoriteColors.join(', ')}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-2">
+                <span className="font-semibold text-[#18181B]">Style Direction</span>
+                <span>{stylePrefs.join(', ')}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-[#18181B]">Home City</span>
+                <span>{city}</span>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Step Navigation Actions */}
+        {/* Stepper Navigation Actions */}
         <div className="flex items-center justify-between pt-2">
           {currentStep > 1 ? (
             <button
               type="button"
               onClick={handlePrevStep}
-              disabled={isSaving}
-              className="inline-flex items-center space-x-1.5 px-5 py-3 rounded-full bg-white border border-[#EBE5DB] text-xs font-semibold text-[#5E4633] hover:text-[#18181B] hover:border-[#18181B] transition-all shadow-2xs"
+              className="px-5 py-2.5 rounded-full border border-[#EBE5DB] bg-white text-[#5E4633] text-xs font-semibold hover:border-[#18181B] transition-colors flex items-center space-x-1.5"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back</span>
             </button>
           ) : (
@@ -865,7 +889,7 @@ export default function OnboardingPage() {
             <button
               type="button"
               onClick={handleNextStep}
-              className="inline-flex items-center space-x-2 bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] px-8 py-3.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all shadow-md active:scale-95"
+              className="px-6 py-3 rounded-full bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] text-xs font-semibold tracking-wide uppercase transition-all shadow-md flex items-center space-x-2"
             >
               <span>Continue</span>
               <ArrowRight className="w-4 h-4" />
@@ -875,26 +899,26 @@ export default function OnboardingPage() {
               type="button"
               onClick={handleCompleteOnboarding}
               disabled={isSaving}
-              className="inline-flex items-center space-x-2 bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] px-8 py-3.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all shadow-lg active:scale-95"
+              className="px-8 py-3.5 rounded-full bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] text-xs font-semibold tracking-wide uppercase transition-all shadow-md flex items-center space-x-2"
             >
               {isSaving ? (
                 <span>Saving Profile…</span>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4 text-[#EEDC82]" />
-                  <span>Complete Profile & Enter Wardrobe</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>Enter My Wardrobe</span>
+                  <Sparkles className="w-4 h-4" />
                 </>
               )}
             </button>
           )}
         </div>
-      </div>
 
-      {/* Footer Branding */}
-      <footer className="relative z-10 pt-8 text-center text-[11px] text-[#9A7B5F]">
-        AUREVÉ • Your Wardrobe. Intelligently Styled.
-      </footer>
+        {/* Security / Privacy Assurance */}
+        <div className="text-center flex items-center justify-center space-x-1.5 text-[11px] text-[#9A7B5F]">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Your styling preferences are securely encrypted and private.</span>
+        </div>
+      </div>
     </div>
   );
 }

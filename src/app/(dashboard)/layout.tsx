@@ -15,7 +15,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const [user, setUser] = useState<{ id: string; name: string; mobile_number: string } | null>(null);
+  const [user, setUser] = useState<{ id: string; email?: string; name: string; mobile_number?: string; avatar_url?: string } | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 

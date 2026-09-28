@@ -110,17 +110,21 @@ export type OccasionType =
 export type ItemRole = 'top' | 'bottom' | 'footwear' | 'layer' | 'accessory';
 
 export interface User {
-  id: string;
+  id: string; // Supabase auth.users.id
+  email?: string;
   name: string;
-  mobile_number: string;
-  pin_hash?: string;
+  mobile_number?: string;
+  avatar_url?: string;
   created_at: string;
   updated_at?: string;
 }
 
 export interface UserProfile {
   id: string;
-  user_id: string;
+  user_id: string; // Supabase auth.users.id
+  email?: string;
+  full_name?: string;
+  mobile_number?: string; // Required Indian mobile number (+91XXXXXXXXXX)
   height?: string; // e.g., "5'10\"" or "178 cm"
   weight?: string; // e.g., "72 kg"
   skin_tone?: string; // e.g., "Warm Olive", "Dusky", "Fair", "Deep Tan"

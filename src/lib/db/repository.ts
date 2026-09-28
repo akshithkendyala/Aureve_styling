@@ -12,18 +12,11 @@ import {
 import { supabase, supabaseAdmin, isSupabaseConfigured } from './supabase';
 import { SAMPLE_INDIAN_WARDROBE } from '@/lib/ai/sampleWardrobe';
 import { buildLearnedStyleProfile } from '@/lib/ai/personalStyleEngine';
-import {
-  normalizeMobileNumber,
-  mobileToSupabaseEmail,
-  pinToSupabasePassword,
-  hashPin,
-  verifyPin,
-} from '@/lib/auth/pin';
+import { normalizeMobileNumber } from '@/lib/auth/mobile';
 
 // Strict Isolated User Store for local state / caching
 interface IsolatedStore {
   users: Map<string, User>; // id -> User
-  usersByMobile: Map<string, string>; // clean mobile -> id
   profiles: Map<string, UserProfile>; // userId -> UserProfile
   wardrobe: Map<string, WardrobeItem[]>; // userId -> items[]
   outfits: Map<string, Outfit[]>; // userId -> outfits[]
@@ -36,7 +29,6 @@ declare global {
 
 const dbStore: IsolatedStore = global.__aureve_db__ || {
   users: new Map(),
-  usersByMobile: new Map(),
   profiles: new Map(),
   wardrobe: new Map(),
   outfits: new Map(),
@@ -57,84 +49,8 @@ function generateId(): string {
 
 export const Repository = {
   // ============================================================================
-  // USER AUTHENTICATION & LOOKUP
+  // USER AUTHENTICATION & SYNC (GOOGLE OAUTH / SUPABASE AUTH IDENTITY)
   // ============================================================================
-
-  /**
-   * Look up an existing user by their 10-digit mobile number in Supabase Auth & public.users table
-   */
-  async findUserByMobile(mobile: string): Promise<User | null> {
-    const cleanMobile = normalizeMobileNumber(mobile);
-    if (!cleanMobile) return null;
-
-    if (isSupabaseConfigured && supabaseAdmin) {
-      // 1. Check users table in Supabase first
-      try {
-        const { data: dbUser, error: dbErr } = await supabaseAdmin
-          .from('users')
-          .select('*')
-          .eq('mobile_number', cleanMobile)
-          .maybeSingle();
-
-        if (!dbErr && dbUser) {
-          return {
-            id: dbUser.id,
-            name: dbUser.name,
-            mobile_number: dbUser.mobile_number,
-            pin_hash: dbUser.pin_hash,
-            created_at: dbUser.created_at,
-            updated_at: dbUser.updated_at,
-          };
-        }
-      } catch (err) {
-        console.warn('Supabase findUserByMobile table error:', err);
-      }
-
-      // 2. Check Supabase Auth admin
-      try {
-        const email = mobileToSupabaseEmail(cleanMobile);
-        const { data, error } = await supabaseAdmin.auth.admin.listUsers();
-        if (!error && data?.users) {
-          const found = data.users.find(
-            (u) =>
-              u.email === email ||
-              u.user_metadata?.mobile_number === cleanMobile
-          );
-
-          if (found) {
-            const user: User = {
-              id: found.id,
-              name: found.user_metadata?.name || 'User',
-              mobile_number: found.user_metadata?.mobile_number || cleanMobile,
-              created_at: found.created_at,
-              updated_at: found.updated_at,
-            };
-
-            // Auto-sync into public.users
-            try {
-              await supabaseAdmin.from('users').upsert(
-                {
-                  id: user.id,
-                  name: user.name,
-                  mobile_number: user.mobile_number,
-                  pin_hash: '',
-                },
-                { onConflict: 'mobile_number' }
-              );
-            } catch (syncErr) {
-              console.warn('Auto-sync public.users error:', syncErr);
-            }
-
-            return user;
-          }
-        }
-      } catch (err) {
-        console.warn('Supabase Auth findUserByMobile error:', err);
-      }
-    }
-
-    return null;
-  },
 
   /**
    * Look up an authenticated user by their unique UUID in Supabase Auth & public.users table
@@ -151,205 +67,166 @@ export const Repository = {
           .eq('id', id)
           .maybeSingle();
 
+        // 2. Also check Supabase Auth admin user for email & metadata
+        let authEmail = '';
+        let authName = '';
+        let authMobile = '';
+        let authAvatar = '';
+
+        try {
+          const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.getUserById(id);
+          if (!authErr && authData?.user) {
+            authEmail = authData.user.email || '';
+            authName =
+              authData.user.user_metadata?.full_name ||
+              authData.user.user_metadata?.name ||
+              authEmail.split('@')[0] ||
+              'Member';
+            authMobile = authData.user.user_metadata?.mobile_number || '';
+            authAvatar =
+              authData.user.user_metadata?.avatar_url ||
+              authData.user.user_metadata?.picture ||
+              '';
+          }
+        } catch {
+          // Ignore auth admin error
+        }
+
         if (!dbErr && dbUser) {
-          return {
+          const user: User = {
             id: dbUser.id,
-            name: dbUser.name,
-            mobile_number: dbUser.mobile_number,
-            pin_hash: dbUser.pin_hash,
+            email: authEmail,
+            name: dbUser.name || authName || 'Member',
+            mobile_number: dbUser.mobile_number || authMobile || '',
+            avatar_url: authAvatar,
             created_at: dbUser.created_at,
             updated_at: dbUser.updated_at,
           };
-        }
-      } catch (err) {
-        console.warn('Supabase findUserById table error:', err);
-      }
-
-      // 2. Check Supabase Auth admin
-      try {
-        const { data, error } = await supabaseAdmin.auth.admin.getUserById(id);
-        if (!error && data?.user) {
-          const u = data.user;
-          return {
-            id: u.id,
-            name: u.user_metadata?.name || 'User',
-            mobile_number: u.user_metadata?.mobile_number || '',
-            created_at: u.created_at,
-            updated_at: u.updated_at,
+          dbStore.users.set(user.id, user);
+          return user;
+        } else if (authEmail) {
+          // If auth user exists but not in public.users, create it
+          const user: User = {
+            id,
+            email: authEmail,
+            name: authName || 'Member',
+            mobile_number: authMobile || '',
+            avatar_url: authAvatar,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           };
+          try {
+            await supabaseAdmin.from('users').upsert(
+              {
+                id: user.id,
+                name: user.name,
+                mobile_number: user.mobile_number || '',
+                pin_hash: '',
+              },
+              { onConflict: 'id' }
+            );
+          } catch (syncErr) {
+            console.warn('Auto-sync public.users error:', syncErr);
+          }
+          dbStore.users.set(user.id, user);
+          return user;
         }
       } catch (err) {
-        console.warn('Supabase Auth findUserById error:', err);
+        console.warn('Supabase findUserById error:', err);
       }
     }
+
+    const cached = dbStore.users.get(id);
+    if (cached) return cached;
 
     return null;
   },
 
   /**
-   * Verify user credentials (mobile + PIN) against Supabase Auth
+   * Sync Google OAuth authenticated user into public.users and ensure initial profile exists
    */
-  async verifyCredentials(mobile: string, pin: string): Promise<{ success: boolean; user?: User; error?: string }> {
-    const cleanMobile = normalizeMobileNumber(mobile);
-    if (!cleanMobile) {
-      return { success: false, error: 'Invalid mobile number.' };
-    }
+  async syncUserFromAuth(authUser: {
+    id: string;
+    email?: string;
+    user_metadata?: {
+      full_name?: string;
+      name?: string;
+      mobile_number?: string;
+      avatar_url?: string;
+      picture?: string;
+    };
+    created_at?: string;
+  }): Promise<User> {
+    const userId = authUser.id;
+    const name =
+      authUser.user_metadata?.full_name ||
+      authUser.user_metadata?.name ||
+      authUser.email?.split('@')[0] ||
+      'Member';
+    const mobileNumber = authUser.user_metadata?.mobile_number || '';
+    const avatarUrl =
+      authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || '';
 
-    if (isSupabaseConfigured && supabase) {
-      const email = mobileToSupabaseEmail(cleanMobile);
-      const password = pinToSupabasePassword(pin);
+    const user: User = {
+      id: userId,
+      email: authUser.email,
+      name,
+      mobile_number: mobileNumber,
+      avatar_url: avatarUrl,
+      created_at: authUser.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
 
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (!error && data?.user) {
-          const user: User = {
-            id: data.user.id,
-            name: data.user.user_metadata?.name || 'User',
-            mobile_number: data.user.user_metadata?.mobile_number || cleanMobile,
-            created_at: data.user.created_at,
-            updated_at: data.user.updated_at,
-          };
-          dbStore.users.set(user.id, user);
-          dbStore.usersByMobile.set(cleanMobile, user.id);
-          return { success: true, user };
-        }
-      } catch (err) {
-        console.warn('Supabase signInWithPassword exception:', err);
-      }
-    }
-
-    // Check database / fallback store if Supabase Auth check didn't succeed
-    const user = await this.findUserByMobile(cleanMobile);
-    if (!user) {
-      return { success: false, error: 'No account found with this mobile number. Please register your account.' };
-    }
-
-    if (user.pin_hash) {
-      const isValid = await verifyPin(pin, user.pin_hash);
-      if (isValid) {
-        return { success: true, user };
-      }
-    }
-
-    return { success: false, error: 'Invalid mobile number or PIN.' };
-  },
-
-  /**
-   * Register a new user in Supabase Auth, create default profile, and seed starter wardrobe
-   */
-  async createUser(name: string, mobileNumber: string, pin: string): Promise<User> {
-    const cleanMobile = normalizeMobileNumber(mobileNumber);
-    const pinHash = await hashPin(pin);
+    dbStore.users.set(userId, user);
 
     if (isSupabaseConfigured && supabaseAdmin) {
-      const email = mobileToSupabaseEmail(cleanMobile);
-      const password = pinToSupabasePassword(pin);
-
-      // Create in Supabase Auth
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: {
-          name: name.trim(),
-          mobile_number: cleanMobile,
-        },
-      });
-
-      if (authError) {
-        throw new Error(authError.message || 'Could not create account in Supabase Auth');
-      }
-
-      const createdUser: User = {
-        id: authData.user.id,
-        name: name.trim(),
-        mobile_number: cleanMobile,
-        pin_hash: pinHash,
-        created_at: authData.user.created_at,
-        updated_at: authData.user.updated_at,
-      };
-
-      dbStore.users.set(createdUser.id, createdUser);
-      dbStore.usersByMobile.set(cleanMobile, createdUser.id);
-
-      // 1. Sync with public.users table FIRST (primary user row)
+      // 1. Sync public.users
       try {
-        const { error: uErr } = await supabaseAdmin.from('users').upsert(
+        await supabaseAdmin.from('users').upsert(
           {
-            id: createdUser.id,
-            name: createdUser.name,
-            mobile_number: createdUser.mobile_number,
-            pin_hash: pinHash,
+            id: userId,
+            name,
+            mobile_number: mobileNumber || '',
+            pin_hash: '',
+            updated_at: new Date().toISOString(),
           },
-          { onConflict: 'mobile_number' }
+          { onConflict: 'id' }
         );
-        if (uErr) console.error('Supabase public.users insertion error:', uErr);
-      } catch (uErr) {
-        console.warn('Supabase public.users note:', uErr);
+      } catch (err) {
+        console.warn('syncUserFromAuth public.users error:', err);
       }
 
-      // 2. Create default profile in public.profiles table SECOND (references users.id)
+      // 2. Check if profile already exists in public.profiles
       try {
-        const { error: pErr } = await supabaseAdmin.from('profiles').upsert(
-          {
-            user_id: createdUser.id,
+        const { data: existingProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('id, profile_completed')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (!existingProfile) {
+          // Create initial empty profile
+          await supabaseAdmin.from('profiles').insert({
+            user_id: userId,
             city: 'Mumbai',
+            height: "5'10\"",
+            weight: '72 kg',
+            skin_tone: 'Warm Olive',
             preferred_fit: 'Regular',
-            favorite_colors: ['Navy Blue', 'White', 'Olive Green', 'Charcoal Grey'],
+            favorite_colors: ['Navy Blue', 'White', 'Olive Green', 'Charcoal Grey', 'Beige'],
             avoided_colors: ['Neon Green', 'Bright Orange'],
             style_preferences: ['Smart Casual', 'Minimal', 'Modern Indian'],
             comfort_preference: 'Balanced',
             typical_occasions: ['Office', 'Casual outings', 'Dates'],
             profile_completed: false,
-          },
-          { onConflict: 'user_id' }
-        );
-        if (pErr) console.error('Supabase profile creation error:', pErr);
-      } catch (pErr) {
-        console.warn('Supabase profile creation note:', pErr);
+          });
+        }
+      } catch (err) {
+        console.warn('syncUserFromAuth profile creation error:', err);
       }
-
-      return createdUser;
     }
 
-    // Local fallback store
-    const userId = generateId();
-    const newUser: User = {
-      id: userId,
-      name: name.trim(),
-      mobile_number: cleanMobile,
-      pin_hash: pinHash,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    dbStore.users.set(newUser.id, newUser);
-    dbStore.usersByMobile.set(cleanMobile, newUser.id);
-
-    // Default profile
-    const defaultProfile: UserProfile = {
-      id: generateId(),
-      user_id: newUser.id,
-      city: 'Mumbai',
-      height: "5'10\"",
-      weight: '72 kg',
-      skin_tone: 'Warm Olive',
-      preferred_fit: 'Regular',
-      favorite_colors: ['Navy Blue', 'White', 'Olive Green', 'Charcoal Grey', 'Beige'],
-      avoided_colors: ['Neon Green', 'Bright Orange'],
-      style_preferences: ['Smart Casual', 'Minimal', 'Modern Indian'],
-      comfort_preference: 'Balanced',
-      typical_occasions: ['Office', 'Casual outings', 'Dates'],
-      profile_completed: false,
-      created_at: new Date().toISOString(),
-    };
-    dbStore.profiles.set(newUser.id, defaultProfile);
-
-    return newUser;
+    return user;
   },
 
   // ============================================================================
@@ -359,34 +236,79 @@ export const Repository = {
   async getUserProfile(userId: string): Promise<UserProfile | null> {
     if (!userId) return null;
 
+    let profileData: any = null;
+    let userRecord: User | null = null;
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
-        const { data, error } = await supabaseAdmin
-          .from('profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .maybeSingle();
+        const [profileRes, userRes] = await Promise.all([
+          supabaseAdmin.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
+          this.findUserById(userId),
+        ]);
 
-        if (!error && data) {
-          const prof: UserProfile = {
-            ...(data as UserProfile),
-            profile_completed: Boolean(data.profile_completed),
-          };
-          dbStore.profiles.set(userId, prof);
-          return prof;
+        if (!profileRes.error && profileRes.data) {
+          profileData = profileRes.data;
         }
+        userRecord = userRes;
       } catch (err) {
         console.warn('Supabase getUserProfile note:', err);
       }
     }
 
-    const cached = dbStore.profiles.get(userId);
-    if (cached) return cached;
+    if (!userRecord) {
+      userRecord = dbStore.users.get(userId) || null;
+    }
 
-    // Return sensible default profile
+    if (profileData) {
+      const prof: UserProfile = {
+        id: profileData.id,
+        user_id: userId,
+        email: userRecord?.email || '',
+        full_name: userRecord?.name || '',
+        mobile_number: userRecord?.mobile_number || '',
+        height: profileData.height || "5'10\"",
+        weight: profileData.weight || '72 kg',
+        skin_tone: profileData.skin_tone || 'Warm Olive',
+        preferred_fit: profileData.preferred_fit || 'Regular',
+        favorite_colors: Array.isArray(profileData.favorite_colors)
+          ? profileData.favorite_colors
+          : ['Navy Blue', 'White', 'Olive Green', 'Charcoal Grey', 'Beige'],
+        avoided_colors: Array.isArray(profileData.avoided_colors)
+          ? profileData.avoided_colors
+          : ['Neon Green', 'Bright Orange'],
+        style_preferences: Array.isArray(profileData.style_preferences)
+          ? profileData.style_preferences
+          : ['Smart Casual', 'Minimal', 'Modern Indian'],
+        comfort_preference: profileData.comfort_preference || 'Balanced',
+        typical_occasions: Array.isArray(profileData.typical_occasions)
+          ? profileData.typical_occasions
+          : ['Office', 'Casual outings', 'Dates'],
+        city: profileData.city || 'Mumbai',
+        profile_completed: Boolean(profileData.profile_completed),
+        created_at: profileData.created_at || new Date().toISOString(),
+        updated_at: profileData.updated_at || new Date().toISOString(),
+      };
+      dbStore.profiles.set(userId, prof);
+      return prof;
+    }
+
+    const cached = dbStore.profiles.get(userId);
+    if (cached) {
+      return {
+        ...cached,
+        email: userRecord?.email || cached.email || '',
+        full_name: userRecord?.name || cached.full_name || '',
+        mobile_number: userRecord?.mobile_number || cached.mobile_number || '',
+      };
+    }
+
+    // Return sensible default profile if not found
     const defaultProfile: UserProfile = {
       id: generateId(),
       user_id: userId,
+      email: userRecord?.email || '',
+      full_name: userRecord?.name || 'Member',
+      mobile_number: userRecord?.mobile_number || '',
       city: 'Mumbai',
       height: "5'10\"",
       weight: '72 kg',
@@ -406,25 +328,45 @@ export const Repository = {
 
   async upsertUserProfile(userId: string, profileData: Partial<UserProfile>): Promise<UserProfile> {
     const existing = await this.getUserProfile(userId);
+
+    const cleanMobile = profileData.mobile_number
+      ? normalizeMobileNumber(profileData.mobile_number) || profileData.mobile_number
+      : existing?.mobile_number || '';
+
+    const fullName = profileData.full_name || existing?.full_name || 'Member';
+
     const updated: UserProfile = {
       id: existing?.id || generateId(),
       user_id: userId,
+      email: existing?.email || profileData.email || '',
+      full_name: fullName,
+      mobile_number: cleanMobile,
       height: profileData.height ?? existing?.height ?? "5'10\"",
       weight: profileData.weight ?? existing?.weight ?? '72 kg',
       skin_tone: profileData.skin_tone ?? existing?.skin_tone ?? 'Warm Olive',
       preferred_fit: profileData.preferred_fit ?? existing?.preferred_fit ?? 'Regular',
-      favorite_colors: profileData.favorite_colors ?? existing?.favorite_colors ?? ['Navy Blue', 'White', 'Charcoal Grey'],
+      favorite_colors:
+        profileData.favorite_colors ??
+        existing?.favorite_colors ?? ['Navy Blue', 'White', 'Charcoal Grey'],
       avoided_colors: profileData.avoided_colors ?? existing?.avoided_colors ?? [],
-      style_preferences: profileData.style_preferences ?? existing?.style_preferences ?? ['Smart Casual', 'Minimal'],
+      style_preferences:
+        profileData.style_preferences ??
+        existing?.style_preferences ?? ['Smart Casual', 'Minimal'],
       comfort_preference: profileData.comfort_preference ?? existing?.comfort_preference ?? 'Balanced',
-      typical_occasions: profileData.typical_occasions ?? existing?.typical_occasions ?? ['Office', 'Casual outings', 'Dates'],
+      typical_occasions:
+        profileData.typical_occasions ??
+        existing?.typical_occasions ?? ['Office', 'Casual outings', 'Dates'],
       city: profileData.city ?? existing?.city ?? 'Mumbai',
-      profile_completed: profileData.profile_completed !== undefined ? profileData.profile_completed : (existing?.profile_completed ?? false),
+      profile_completed:
+        profileData.profile_completed !== undefined
+          ? profileData.profile_completed
+          : (existing?.profile_completed ?? false),
       created_at: existing?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
     if (isSupabaseConfigured && supabaseAdmin) {
+      // 1. Update public.profiles
       try {
         const { data, error } = await supabaseAdmin
           .from('profiles')
@@ -450,19 +392,48 @@ export const Repository = {
           .single();
 
         if (!error && data) {
-          const saved: UserProfile = {
-            ...(data as UserProfile),
-            profile_completed: Boolean(data.profile_completed),
-          };
-          dbStore.profiles.set(userId, saved);
-          return saved;
+          updated.id = data.id;
         }
       } catch (err) {
         console.warn('Supabase upsertUserProfile note:', err);
       }
+
+      // 2. Sync mobile number and full name into public.users and Supabase Auth metadata
+      try {
+        await supabaseAdmin.from('users').upsert(
+          {
+            id: userId,
+            name: fullName,
+            mobile_number: cleanMobile || '',
+            pin_hash: '',
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
+
+        // Update auth user metadata
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
+          user_metadata: {
+            full_name: fullName,
+            name: fullName,
+            mobile_number: cleanMobile,
+          },
+        });
+      } catch (userSyncErr) {
+        console.warn('User metadata sync note:', userSyncErr);
+      }
     }
 
     dbStore.profiles.set(userId, updated);
+    const existingUser = dbStore.users.get(userId);
+    if (existingUser) {
+      dbStore.users.set(userId, {
+        ...existingUser,
+        name: fullName,
+        mobile_number: cleanMobile,
+      });
+    }
+
     return updated;
   },
 

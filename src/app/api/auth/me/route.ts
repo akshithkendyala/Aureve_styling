@@ -14,8 +14,10 @@ export async function GET() {
     const user = await Repository.findUserById(session.userId);
     const resolvedUser = user || {
       id: session.userId,
-      name: session.name || '',
+      email: session.email || '',
+      name: session.name || 'Member',
       mobile_number: session.mobile || '',
+      avatar_url: session.avatarUrl || '',
       created_at: new Date().toISOString(),
     };
 
@@ -25,8 +27,10 @@ export async function GET() {
       authenticated: true,
       user: {
         id: resolvedUser.id,
+        email: resolvedUser.email,
         name: resolvedUser.name,
-        mobile_number: resolvedUser.mobile_number,
+        mobile_number: resolvedUser.mobile_number || profile?.mobile_number || '',
+        avatar_url: resolvedUser.avatar_url,
       },
       profile,
       profile_completed: Boolean(profile?.profile_completed),

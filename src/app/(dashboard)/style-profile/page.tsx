@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile } from '@/lib/types';
 import { POPULAR_INDIAN_CITIES } from '@/lib/weather/weatherService';
-import { Sparkles, Check, User, Palette, Sliders, ShieldCheck } from 'lucide-react';
+import { Sparkles, Check, User, Palette, Sliders, Phone, Mail } from 'lucide-react';
+import { normalizeMobileNumber, isValidIndianMobile, formatMobileDisplay } from '@/lib/auth/mobile';
 
 const POPULAR_COLORS = [
   'Navy Blue',
@@ -46,6 +47,8 @@ const POPULAR_OCCASIONS = [
 
 export default function StyleProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [email, setEmail] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
   const [height, setHeight] = useState("5'10\"");
   const [weight, setWeight] = useState('72 kg');
   const [skinTone, setSkinTone] = useState('Warm Olive');
@@ -60,6 +63,7 @@ export default function StyleProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     async function loadProfile() {
@@ -70,6 +74,11 @@ export default function StyleProfilePage() {
           if (data.profile) {
             const p = data.profile;
             setProfile(p);
+            if (p.email) setEmail(p.email);
+            if (p.mobile_number) {
+              const rawDigits = p.mobile_number.replace(/\D/g, '');
+              setMobileNumber(rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits);
+            }
             if (p.height) setHeight(p.height);
             if (p.weight) setWeight(p.weight);
             if (p.skin_tone) setSkinTone(p.skin_tone);
@@ -129,12 +138,20 @@ export default function StyleProfilePage() {
     e.preventDefault();
     setIsSaving(true);
     setSavedSuccess(false);
+    setSaveError('');
+
+    if (mobileNumber && !isValidIndianMobile(mobileNumber)) {
+      setSaveError('Please enter a valid 10-digit Indian mobile number.');
+      setIsSaving(false);
+      return;
+    }
 
     try {
       const res = await fetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          mobile_number: mobileNumber ? normalizeMobileNumber(mobileNumber) : undefined,
           height,
           weight,
           skin_tone: skinTone,
@@ -152,9 +169,13 @@ export default function StyleProfilePage() {
       if (res.ok) {
         setSavedSuccess(true);
         setTimeout(() => setSavedSuccess(false), 3000);
+      } else {
+        const d = await res.json();
+        setSaveError(d.error || 'Failed to save profile');
       }
     } catch (e) {
       console.error(e);
+      setSaveError('A connection error occurred while saving.');
     } finally {
       setIsSaving(false);
     }
@@ -182,11 +203,66 @@ export default function StyleProfilePage() {
         </div>
       )}
 
+      {saveError && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 flex items-center space-x-2 animate-in fade-in duration-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-600 flex-shrink-0" />
+          <span>{saveError}</span>
+        </div>
+      )}
+
       <form onSubmit={handleSaveProfile} className="space-y-8">
-        {/* 1. Proportions & Silhouette */}
-        <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-5">
+        {/* 1. Account & Contact Verification */}
+        <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-4">
           <div className="flex items-center space-x-2 pb-3 border-b border-[#F4EFEA]">
             <User className="w-4 h-4 text-[#9A7B5F]" />
+            <h3 className="font-serif text-xl font-semibold text-[#18181B]">
+              Account & Mobile Contact
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {email && (
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
+                  Google Account (Verified)
+                </label>
+                <div className="relative flex items-center">
+                  <Mail className="absolute left-3.5 w-4 h-4 text-[#9A7B5F]" />
+                  <input
+                    type="text"
+                    readOnly
+                    value={email}
+                    className="w-full pl-10 pr-4 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#7E6047] cursor-default focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
+                Registered Mobile Number <span className="text-rose-600">*</span>
+              </label>
+              <div className="relative flex items-center">
+                <span className="absolute left-3.5 text-xs font-semibold text-[#7E6047] border-r border-[#D6C7B7] pr-2">
+                  +91
+                </span>
+                <input
+                  type="tel"
+                  maxLength={10}
+                  value={mobileNumber}
+                  onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                  placeholder="98765 43210"
+                  className="w-full pl-16 pr-4 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Proportions & Silhouette */}
+        <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-5">
+          <div className="flex items-center space-x-2 pb-3 border-b border-[#F4EFEA]">
+            <Sliders className="w-4 h-4 text-[#9A7B5F]" />
             <h3 className="font-serif text-xl font-semibold text-[#18181B]">
               Proportions & Silhouette
             </h3>
@@ -249,45 +325,62 @@ export default function StyleProfilePage() {
                     key={fit}
                     type="button"
                     onClick={() => setPreferredFit(fit as any)}
-                    className={`p-3 rounded-2xl border text-xs font-semibold transition-all ${
+                    className={`p-3 rounded-2xl border text-center transition-all ${
                       isSelected
-                        ? 'bg-[#18181B] text-white border-[#18181B]'
-                        : 'bg-[#FAF8F5] border-[#EBE5DB] text-[#5E4633] hover:bg-white'
+                        ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
+                        : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
                     }`}
                   >
-                    {fit} Fit
+                    <span className="text-xs font-semibold">{fit}</span>
                   </button>
                 );
               })}
             </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
+              Home City
+            </label>
+            <select
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
+            >
+              {POPULAR_INDIAN_CITIES.map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.name} ({c.state})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* 2. Color Palette Preferences */}
-        <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-5">
+        {/* 3. Color Preferences */}
+        <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6">
           <div className="flex items-center space-x-2 pb-3 border-b border-[#F4EFEA]">
             <Palette className="w-4 h-4 text-[#9A7B5F]" />
             <h3 className="font-serif text-xl font-semibold text-[#18181B]">
-              Color Palette Harmony
+              Color Preferences
             </h3>
           </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
-              Favorite Colors (Prioritized by AI Stylist)
+              Favorite Colors
             </label>
             <div className="flex flex-wrap gap-2">
               {POPULAR_COLORS.map((col) => {
-                const active = favoriteColors.includes(col);
+                const isSelected = favoriteColors.includes(col);
                 return (
                   <button
                     key={col}
                     type="button"
                     onClick={() => toggleFavColor(col)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      active
-                        ? 'bg-[#18181B] text-white shadow-xs'
-                        : 'bg-[#FAF8F5] border border-[#EBE5DB] text-[#5E4633] hover:bg-white'
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      isSelected
+                        ? 'bg-[#18181B] text-white'
+                        : 'bg-[#FAF8F5] text-[#5E4633] border border-[#EBE5DB] hover:border-[#18181B]'
                     }`}
                   >
                     {col}
@@ -303,16 +396,16 @@ export default function StyleProfilePage() {
             </label>
             <div className="flex flex-wrap gap-2">
               {POPULAR_COLORS.map((col) => {
-                const active = avoidedColors.includes(col);
+                const isAvoided = avoidedColors.includes(col);
                 return (
                   <button
                     key={col}
                     type="button"
                     onClick={() => toggleAvoidColor(col)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      active
-                        ? 'bg-rose-900 text-white'
-                        : 'bg-[#FAF8F5] border border-[#EBE5DB] text-[#5E4633] hover:bg-white'
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      isAvoided
+                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                        : 'bg-[#FAF8F5] text-[#5E4633] border border-[#EBE5DB] hover:border-[#18181B]'
                     }`}
                   >
                     {col}
@@ -323,103 +416,84 @@ export default function StyleProfilePage() {
           </div>
         </div>
 
-        {/* 3. Style Persona & Comfort Preference */}
-        <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-5">
+        {/* 4. Style & Occasions */}
+        <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6">
           <div className="flex items-center space-x-2 pb-3 border-b border-[#F4EFEA]">
-            <Sliders className="w-4 h-4 text-[#9A7B5F]" />
+            <Sparkles className="w-4 h-4 text-[#9A7B5F]" />
             <h3 className="font-serif text-xl font-semibold text-[#18181B]">
-              Fashion Direction & Comfort
+              Style & Occasions
             </h3>
           </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
-              Preferred Style Personas
+              Style Personas
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {STYLE_PREFERENCES.map((style) => {
-                const active = stylePrefs.includes(style);
+                const isSelected = stylePrefs.includes(style);
                 return (
                   <button
                     key={style}
                     type="button"
                     onClick={() => toggleStylePref(style)}
-                    className={`px-3.5 py-2 rounded-2xl text-xs font-medium transition-all ${
-                      active
-                        ? 'bg-[#18181B] text-white shadow-xs'
-                        : 'bg-[#FAF8F5] border border-[#EBE5DB] text-[#5E4633] hover:bg-white'
+                    className={`p-3 rounded-2xl border text-center transition-all ${
+                      isSelected
+                        ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
+                        : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
                     }`}
                   >
-                    {style}
+                    <span className="text-xs font-semibold">{style}</span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
-                Comfort vs. Structure Balance
-              </label>
-              <select
-                value={comfortPreference}
-                onChange={(e) => setComfortPreference(e.target.value as any)}
-                className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
-              >
-                <option value="Maximum Comfort">Maximum Comfort (Breathable, soft fabrics)</option>
-                <option value="Balanced">Balanced (Smart, polished and comfortable)</option>
-                <option value="Structure & Sharpness">Structure & Sharpness (Crisp tailoring)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
-                Home City (Default Weather)
-              </label>
-              <select
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
-              >
-                {POPULAR_INDIAN_CITIES.map((c) => (
-                  <option key={c.name} value={c.name}>
-                    {c.name} ({c.state})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* 4. Typical Occasions */}
-        <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-5">
-          <div className="flex items-center space-x-2 pb-3 border-b border-[#F4EFEA]">
-            <Sparkles className="w-4 h-4 text-[#9A7B5F]" />
-            <h3 className="font-serif text-xl font-semibold text-[#18181B]">
-              Typical Occasions & Lifestyle
-            </h3>
-          </div>
-
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
-              Frequent Settings (Prioritized for Outfit Recommendations)
+              Typical Occasions
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               {POPULAR_OCCASIONS.map((occ) => {
-                const active = typicalOccasions.includes(occ);
+                const isSelected = typicalOccasions.includes(occ);
                 return (
                   <button
                     key={occ}
                     type="button"
                     onClick={() => toggleOccasion(occ)}
-                    className={`px-3.5 py-2 rounded-2xl text-xs font-medium transition-all ${
-                      active
-                        ? 'bg-[#18181B] text-white shadow-xs'
-                        : 'bg-[#FAF8F5] border border-[#EBE5DB] text-[#5E4633] hover:bg-white'
+                    className={`p-3 rounded-2xl border text-center transition-all ${
+                      isSelected
+                        ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
+                        : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
                     }`}
                   >
-                    {occ}
+                    <span className="text-xs font-semibold">{occ}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
+              Comfort Preference
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {['Maximum Comfort', 'Balanced', 'Structure & Sharpness'].map((c) => {
+                const isSelected = comfortPreference === c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setComfortPreference(c as any)}
+                    className={`p-3.5 rounded-2xl border text-left transition-all ${
+                      isSelected
+                        ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
+                        : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
+                    }`}
+                  >
+                    <span className="text-xs font-semibold block">{c}</span>
                   </button>
                 );
               })}
@@ -428,13 +502,13 @@ export default function StyleProfilePage() {
         </div>
 
         {/* Submit */}
-        <div className="flex items-center justify-end">
+        <div className="flex justify-end pt-2">
           <button
             type="submit"
             disabled={isSaving}
-            className="bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] px-8 py-3.5 rounded-full text-xs sm:text-sm font-semibold tracking-wider uppercase transition-all shadow-md active:scale-95"
+            className="px-8 py-3.5 rounded-full bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] text-xs font-semibold tracking-wide uppercase transition-all shadow-md"
           >
-            {isSaving ? 'Updating Profile…' : 'SAVE STYLE PROFILE'}
+            {isSaving ? 'Saving Changes…' : 'Save Style Profile'}
           </button>
         </div>
       </form>
