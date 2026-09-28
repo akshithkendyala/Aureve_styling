@@ -14,7 +14,7 @@ export async function GET() {
     const user = await Repository.findUserById(session.userId);
     const resolvedUser = user || {
       id: session.userId,
-      name: session.name || 'Gentleman',
+      name: session.name || '',
       mobile_number: session.mobile || '',
       created_at: new Date().toISOString(),
     };

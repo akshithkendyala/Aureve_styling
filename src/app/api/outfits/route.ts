@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
       style_match,
       style_direction,
       items,
+      is_self_styled,
+      self_styled_analysis,
       markAsWorn,
     } = body;
 
@@ -58,6 +60,8 @@ export async function POST(req: NextRequest) {
       style_match: style_match || 94,
       style_direction: style_direction || ['Simple', 'Classy', 'Modern'],
       items,
+      is_self_styled: Boolean(is_self_styled),
+      self_styled_analysis: self_styled_analysis || null,
     });
 
     // If marked as worn, update wear count on each individual wardrobe item

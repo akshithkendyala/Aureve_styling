@@ -120,7 +120,7 @@ export default function OnboardingPage() {
 
         const data = await res.json();
         if (data.authenticated && data.user) {
-          setUserName(data.user.name || 'Gentleman');
+          setUserName(data.user.name || '');
 
           // If user already completed onboarding, redirect straight to dashboard
           if (data.profile?.profile_completed === true) {

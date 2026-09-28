@@ -110,7 +110,13 @@ export default function LooksHistoryPage() {
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#F4EFEA] pb-3">
                 <div>
-                  <div className="flex items-center space-x-2 text-[10px] font-bold uppercase tracking-wider text-[#7E6047]">
+                  <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#7E6047]">
+                    {outfit.is_self_styled && (
+                      <span className="bg-[#18181B] text-[#D4AF37] px-2 py-0.5 rounded-full text-[9px] font-semibold flex items-center space-x-1">
+                        <span>✦</span>
+                        <span>Self-Styled</span>
+                      </span>
+                    )}
                     <span>{outfit.occasion}</span>
                     <span>•</span>
                     <span>{outfit.date}</span>
@@ -127,9 +133,16 @@ export default function LooksHistoryPage() {
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs font-semibold px-2.5 py-1 bg-[#FAF8F5] text-[#18181B] border border-[#E8DFD5] rounded-full">
-                    {outfit.style_match}% Match
-                  </span>
+                  {outfit.self_styled_analysis?.overall_score ? (
+                    <span className="text-xs font-bold px-3 py-1 bg-[#18181B] text-white rounded-full flex items-center space-x-1 shadow-2xs">
+                      <span className="text-[#D4AF37]">★</span>
+                      <span>{outfit.self_styled_analysis.overall_score} / 10</span>
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold px-2.5 py-1 bg-[#FAF8F5] text-[#18181B] border border-[#E8DFD5] rounded-full">
+                      {outfit.style_match}% Match
+                    </span>
+                  )}
                   <button
                     onClick={() => handleDeleteOutfit(outfit.id)}
                     className="p-1.5 rounded-full text-[#9A7B5F] hover:text-rose-600 hover:bg-rose-50 transition-colors"
@@ -139,6 +152,36 @@ export default function LooksHistoryPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Self Styled Score Breakdown if present */}
+              {outfit.self_styled_analysis?.breakdown && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1 pb-1">
+                  <div className="bg-[#FAF8F5] border border-[#E8DFD5] rounded-xl px-2.5 py-1.5 text-center">
+                    <span className="text-[9px] uppercase font-bold text-[#7E6047] block">Color Harmony</span>
+                    <span className="font-serif text-xs font-semibold text-[#18181B]">{outfit.self_styled_analysis.breakdown.color_harmony}/10</span>
+                  </div>
+                  <div className="bg-[#FAF8F5] border border-[#E8DFD5] rounded-xl px-2.5 py-1.5 text-center">
+                    <span className="text-[9px] uppercase font-bold text-[#7E6047] block">Style Cohesion</span>
+                    <span className="font-serif text-xs font-semibold text-[#18181B]">{outfit.self_styled_analysis.breakdown.style_cohesion}/10</span>
+                  </div>
+                  <div className="bg-[#FAF8F5] border border-[#E8DFD5] rounded-xl px-2.5 py-1.5 text-center">
+                    <span className="text-[9px] uppercase font-bold text-[#7E6047] block">Fit &amp; Proportion</span>
+                    <span className="font-serif text-xs font-semibold text-[#18181B]">{outfit.self_styled_analysis.breakdown.fit_and_proportion}/10</span>
+                  </div>
+                  <div className="bg-[#FAF8F5] border border-[#E8DFD5] rounded-xl px-2.5 py-1.5 text-center">
+                    <span className="text-[9px] uppercase font-bold text-[#7E6047] block">Occasion Fit</span>
+                    <span className="font-serif text-xs font-semibold text-[#18181B]">{outfit.self_styled_analysis.breakdown.occasion_fit}/10</span>
+                  </div>
+                  <div className="bg-[#FAF8F5] border border-[#E8DFD5] rounded-xl px-2.5 py-1.5 text-center">
+                    <span className="text-[9px] uppercase font-bold text-[#7E6047] block">Footwear</span>
+                    <span className="font-serif text-xs font-semibold text-[#18181B]">{outfit.self_styled_analysis.breakdown.footwear_compatibility}/10</span>
+                  </div>
+                  <div className="bg-[#FAF8F5] border border-[#E8DFD5] rounded-xl px-2.5 py-1.5 text-center">
+                    <span className="text-[9px] uppercase font-bold text-[#7E6047] block">Accessories</span>
+                    <span className="font-serif text-xs font-semibold text-[#18181B]">{outfit.self_styled_analysis.breakdown.accessory_balance}/10</span>
+                  </div>
+                </div>
+              )}
 
               {/* Items thumbnails in Myntra-style boxes */}
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -172,10 +215,23 @@ export default function LooksHistoryPage() {
                 })}
               </div>
 
-              {/* AI Reasoning summary */}
-              <p className="text-xs text-[#5E4633] italic bg-[#FAF8F5] p-3 rounded-xl border border-[#E8DFD5]">
-                “{outfit.ai_explanation}”
-              </p>
+              {/* AI Reasoning summary / Analysis Feedback */}
+              <div className="space-y-2">
+                <p className="text-xs text-[#5E4633] italic bg-[#FAF8F5] p-3 rounded-xl border border-[#E8DFD5]">
+                  “{outfit.ai_explanation}”
+                </p>
+
+                {outfit.self_styled_analysis?.how_to_improve && (
+                  <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#E8DFD5] text-xs space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-[#7E6047] tracking-wider block">
+                      ✦ AUREVÉ Stylist Suggestion
+                    </span>
+                    <p className="text-[#18181B]">
+                      {outfit.self_styled_analysis.how_to_improve}
+                    </p>
+                  </div>
+                )}
+              </div>
 
               {/* Card Footer Actions */}
               <div className="flex items-center justify-between pt-1 text-xs">
@@ -189,10 +245,14 @@ export default function LooksHistoryPage() {
                 </button>
 
                 <Link
-                  href={`/create-outfit?occasion=${encodeURIComponent(outfit.occasion)}`}
+                  href={
+                    outfit.is_self_styled
+                      ? '/style-yourself'
+                      : `/create-outfit?occasion=${encodeURIComponent(outfit.occasion)}`
+                  }
                   className="inline-flex items-center space-x-1 font-semibold text-[#18181B] hover:text-[#7E6047]"
                 >
-                  <span>Re-style similar occasion →</span>
+                  <span>{outfit.is_self_styled ? 'Style another look →' : 'Re-style similar occasion →'}</span>
                 </Link>
               </div>
             </div>

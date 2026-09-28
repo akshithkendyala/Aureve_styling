@@ -104,7 +104,7 @@ export const Repository = {
           if (found) {
             const user: User = {
               id: found.id,
-              name: found.user_metadata?.name || 'Gentleman',
+              name: found.user_metadata?.name || 'User',
               mobile_number: found.user_metadata?.mobile_number || cleanMobile,
               created_at: found.created_at,
               updated_at: found.updated_at,
@@ -172,7 +172,7 @@ export const Repository = {
           const u = data.user;
           return {
             id: u.id,
-            name: u.user_metadata?.name || 'Gentleman',
+            name: u.user_metadata?.name || 'User',
             mobile_number: u.user_metadata?.mobile_number || '',
             created_at: u.created_at,
             updated_at: u.updated_at,
@@ -208,7 +208,7 @@ export const Repository = {
         if (!error && data?.user) {
           const user: User = {
             id: data.user.id,
-            name: data.user.user_metadata?.name || 'Gentleman',
+            name: data.user.user_metadata?.name || 'User',
             mobile_number: data.user.user_metadata?.mobile_number || cleanMobile,
             created_at: data.user.created_at,
             updated_at: data.user.updated_at,
@@ -885,6 +885,8 @@ export const Repository = {
             ai_explanation: outfitData.ai_explanation,
             style_match: outfitData.style_match,
             style_direction: outfitData.style_direction,
+            is_self_styled: outfitData.is_self_styled || false,
+            self_styled_analysis: outfitData.self_styled_analysis || null,
           })
           .select('*')
           .single();
@@ -906,6 +908,8 @@ export const Repository = {
             ...createdOutfit,
             items: outfitData.items,
             alternative_looks: outfitData.alternative_looks,
+            is_self_styled: outfitData.is_self_styled,
+            self_styled_analysis: outfitData.self_styled_analysis,
           };
           const list = dbStore.outfits.get(userId) || [];
           list.unshift(fullOutfit);
@@ -956,6 +960,8 @@ export const Repository = {
             ai_explanation: row.ai_explanation,
             style_match: row.style_match,
             style_direction: row.style_direction,
+            is_self_styled: Boolean(row.is_self_styled),
+            self_styled_analysis: row.self_styled_analysis || null,
             created_at: row.created_at,
             items: (row.outfit_items || []).map((oi: any) => ({
               wardrobe_item_id: oi.wardrobe_item_id,

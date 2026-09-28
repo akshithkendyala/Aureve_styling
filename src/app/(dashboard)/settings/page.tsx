@@ -130,7 +130,7 @@ export default function SettingsPage() {
           <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#EBE5DB]">
             <span className="text-[10px] uppercase font-bold text-[#7E6047]">Account Name</span>
             <p className="font-serif text-lg font-semibold text-[#18181B] mt-0.5">
-              {user?.name || 'Gentleman'}
+              {user?.name || 'Member'}
             </p>
           </div>
 

@@ -36,7 +36,7 @@ import { TravelPlannerModal } from '@/components/special/TravelPlannerModal';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [userName, setUserName] = useState('Gentleman');
+  const [userName, setUserName] = useState('');
   const [wardrobe, setWardrobe] = useState<WardrobeItem[]>([]);
   const [outfits, setOutfits] = useState<Outfit[]>([]);
   const [stats, setStats] = useState<WardrobeStats | null>(null);
@@ -73,9 +73,10 @@ export default function DashboardPage() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+    let timeGreeting = 'Good morning';
+    if (hour >= 12 && hour < 17) timeGreeting = 'Good afternoon';
+    else if (hour >= 17) timeGreeting = 'Good evening';
+    return userName ? `${timeGreeting}, ${userName}` : timeGreeting;
   };
 
   const loadDashboardData = async () => {
@@ -156,7 +157,7 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <span className="text-xs uppercase font-bold tracking-widest text-[#7E6047]">
-            {getGreeting()}, {userName}
+            {getGreeting()}
           </span>
           <h1 className="font-serif text-3xl sm:text-5xl font-light text-[#18181B] tracking-tight mt-1">
             What are we wearing today?
@@ -165,6 +166,13 @@ export default function DashboardPage() {
 
         {/* Quick Mode Triggers */}
         <div className="flex items-center space-x-2">
+          <Link
+            href="/style-yourself"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-full bg-[#18181B] text-[#FAF8F5] hover:bg-[#3D2E22] text-xs font-semibold transition-all shadow-sm"
+          >
+            <span>✦ Style It Yourself</span>
+          </Link>
+
           <button
             type="button"
             onClick={() => setIsQuickDressOpen(true)}
@@ -185,8 +193,69 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 2. THE CORE HERO COMPONENT: "CREATE YOUR LOOK" */}
-      <section className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 lg:p-10 shadow-xl relative overflow-hidden">
+      {/* 2. DUAL MODE SHOWCASE / STYLE IT YOURSELF HIGHLIGHT */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 bg-[#18181B] rounded-3xl p-6 sm:p-8 text-[#FAF8F5] relative overflow-hidden shadow-lg flex flex-col justify-between">
+          <div className="space-y-2 relative z-10">
+            <span className="text-[10px] uppercase font-bold tracking-widest text-[#D4AF37]">
+              ✦ Two Styling Pathways
+            </span>
+            <h2 className="font-serif text-2xl sm:text-3xl font-light tracking-tight text-white">
+              AI Stylist Mode &amp; Style It Yourself
+            </h2>
+            <p className="text-xs sm:text-sm text-[#D6C7B7] max-w-xl font-light leading-relaxed">
+              Let AUREVÉ curate combinations for you, or select garments from your closet and have AUREVÉ provide deep color harmony, proportion scoring, and alternative wardrobe swaps.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3 pt-6 relative z-10">
+            <a
+              href="#create-look-section"
+              className="inline-flex items-center space-x-2 bg-white text-[#18181B] px-4 py-2.5 rounded-full text-xs font-semibold tracking-wide hover:bg-[#FAF8F5] transition-all"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#9A7B5F]" />
+              <span>AUREVÉ Styles You</span>
+            </a>
+            <Link
+              href="/style-yourself"
+              className="inline-flex items-center space-x-2 bg-transparent border border-[#7E6047] text-white hover:bg-white/10 px-4 py-2.5 rounded-full text-xs font-semibold tracking-wide transition-all"
+            >
+              <span>Style Your Own Look</span>
+              <ArrowRight className="w-3.5 h-3.5 text-[#D4AF37]" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Style It Yourself Entry Card */}
+        <Link
+          href="/style-yourself"
+          className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-7 hover:border-[#18181B] shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
+        >
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="w-8 h-8 rounded-full bg-[#FAF8F5] border border-[#E8DFD5] flex items-center justify-center text-[#18181B] group-hover:scale-110 transition-transform font-serif font-bold">
+                ✦
+              </span>
+              <span className="text-[10px] uppercase font-bold tracking-wider text-[#7E6047] bg-[#F4EFEA] px-2.5 py-0.5 rounded-full">
+                Interactive
+              </span>
+            </div>
+            <div>
+              <h3 className="font-serif text-xl font-semibold text-[#18181B] group-hover:text-[#7E6047] transition-colors">
+                Style It Yourself
+              </h3>
+              <p className="text-xs text-[#7E6047] mt-1.5 leading-relaxed">
+                Build a look from your wardrobe and let AUREVÉ rate it with categorical scoring and closet-first suggestions.
+              </p>
+            </div>
+          </div>
+          <div className="pt-4 flex items-center text-xs font-semibold text-[#18181B] group-hover:translate-x-1 transition-transform">
+            <span>Build &amp; Rate Look →</span>
+          </div>
+        </Link>
+      </div>
+
+      {/* 3. THE CORE HERO COMPONENT: "CREATE YOUR LOOK" */}
+      <section id="create-look-section" className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 lg:p-10 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-[#F4EFEA] rounded-full blur-3xl -z-0 opacity-50 pointer-events-none" />
 
         <div className="relative z-10 space-y-6">

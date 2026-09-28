@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Sparkles,
@@ -306,6 +307,30 @@ function CreateOutfitContent() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Mode Switcher Banner: Style It Yourself */}
+      <div className="bg-[#FAF8F5] rounded-3xl border border-[#EBE5DB] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
+        <div className="flex items-start sm:items-center space-x-3.5">
+          <div className="w-9 h-9 rounded-full bg-[#18181B] text-[#D4AF37] flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 shadow-xs">
+            ✦
+          </div>
+          <div>
+            <h4 className="text-xs sm:text-sm font-semibold text-[#18181B]">
+              Prefer to curate your own pieces?
+            </h4>
+            <p className="text-[11px] text-[#7E6047] mt-0.5">
+              Switch to <strong>Style It Yourself</strong> mode to assemble your own look and let AUREVÉ evaluate &amp; rate it.
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/style-yourself"
+          className="inline-flex items-center space-x-1.5 px-4 py-2.5 bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] rounded-full text-xs font-semibold whitespace-nowrap transition-all shadow-xs self-start sm:self-auto group"
+        >
+          <span>✦ Style It Yourself Mode</span>
+          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+        </Link>
       </div>
 
       {/* Input Parameters Box */}

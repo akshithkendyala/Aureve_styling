@@ -33,12 +33,13 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     name: 'Interview',
     aliases: ['job interview', 'interview', 'job fair', 'placement', 'campus placement', 'internship interview'],
     formalityLevels: ['Formal', 'Semi-Formal'],
-    preferredTopSubcategories: ['Shirt', 'Button-Down Shirt', 'Formal Shirt', 'Oxford Shirt'],
-    allowedTopSubcategories: ['Shirt', 'Button-Down Shirt', 'Formal Shirt', 'Oxford Shirt'],
+    preferredTopSubcategories: ['Shirt', 'Button-Down Shirt', 'Formal Shirt', 'Oxford Shirt', 'Blouse'],
+    allowedTopSubcategories: ['Shirt', 'Button-Down Shirt', 'Formal Shirt', 'Oxford Shirt', 'Blouse'],
     forbiddenTopSubcategories: [
       'T-Shirt',
       'Polo',
       'Tank Top',
+      'Crop Top',
       'Sweatshirt',
       'Hoodie',
       'Henley',
@@ -46,8 +47,8 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
       'Overshirt',
       'Other',
     ],
-    preferredBottomSubcategories: ['Trousers', 'Formal Pants'],
-    allowedBottomSubcategories: ['Trousers', 'Formal Pants', 'Chinos'],
+    preferredBottomSubcategories: ['Trousers', 'Formal Pants', 'Wide-Leg Pants'],
+    allowedBottomSubcategories: ['Trousers', 'Formal Pants', 'Chinos', 'Wide-Leg Pants', 'Skirt'],
     forbiddenBottomSubcategories: [
       'Track Pants',
       'Joggers',
@@ -57,8 +58,8 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
       'Pajama',
       'Cargo Pants',
     ],
-    preferredFootwearSubcategories: ['Formal Shoes'],
-    allowedFootwearSubcategories: ['Formal Shoes', 'Loafers'],
+    preferredFootwearSubcategories: ['Formal Shoes', 'Loafers', 'Flats', 'Heels'],
+    allowedFootwearSubcategories: ['Formal Shoes', 'Loafers', 'Flats', 'Heels'],
     forbiddenFootwearSubcategories: [
       'Sneakers',
       'Running Shoes',
@@ -80,8 +81,9 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
       'Sweater',
       'Cardigan',
       'Nehru Jacket',
+      'Shrug',
     ],
-    allowedAccessorySubcategories: ['Belt', 'Watch', 'Tie', 'Pocket Square'],
+    allowedAccessorySubcategories: ['Belt', 'Watch', 'Tie', 'Pocket Square', 'Handbag', 'Bag'],
     forbiddenAccessorySubcategories: ['Cap', 'Hat', 'Sunglasses', 'Casual Bracelet', 'Backpack'],
     forbiddenPatterns: ['Graphic', 'Printed / Floral', 'Colorblock'],
     forbiddenMaterials: ['Terry / French Terry', 'Fleece', 'Jersey / Knit', 'Velvet', 'Corduroy'],
@@ -89,9 +91,9 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     maxAccessories: 2,
     description: 'Crisp, conservative, and polished. Signals competence and executive presence.',
     stylingTips: [
-      'Choose solid crisp shirts in white, sky blue, or subtle pinstripes.',
-      'Pair with dark tailored trousers (charcoal, navy, black, or grey).',
-      'Match your leather belt with your leather shoes.',
+      'Choose solid crisp shirts or tailored blouses in white, sky blue, or subtle pinstripes.',
+      'Pair with dark tailored trousers or structured skirts (charcoal, navy, black, or grey).',
+      'Match your leather belt and footwear for a clean, cohesive look.',
       'Never wear casual track pants, hoodies, t-shirts, or sneakers.',
     ],
   },
@@ -101,18 +103,17 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     name: 'Party / Night Out',
     aliases: ['party', 'night out', 'club', 'pub', 'house party', 'birthday party', 'celebration', 'lounge', 'dinner party', 'cocktail party'],
     formalityLevels: ['Smart Casual', 'Casual'],
-    preferredTopSubcategories: ['Shirt', 'Overshirt'],
-    allowedTopSubcategories: ['Shirt', 'Overshirt', 'T-Shirt', 'Polo', 'Hoodie'],
+    preferredTopSubcategories: ['Shirt', 'Overshirt', 'Crop Top', 'Blouse'],
+    allowedTopSubcategories: ['Shirt', 'Overshirt', 'T-Shirt', 'Polo', 'Crop Top', 'Blouse', 'Sweater', 'Hoodie'],
     forbiddenTopSubcategories: [
       'Kurta',
       'Sherwani',
       'Tank Top',
-      'Sleeveless',
       'Formal Tuxedo Shirt',
       'Gym Wear',
     ],
-    preferredBottomSubcategories: ['Jeans', 'Chinos'],
-    allowedBottomSubcategories: ['Jeans', 'Chinos', 'Cargo Pants', 'Trousers'],
+    preferredBottomSubcategories: ['Jeans', 'Chinos', 'Wide-Leg Pants', 'Skirt'],
+    allowedBottomSubcategories: ['Jeans', 'Chinos', 'Cargo Pants', 'Trousers', 'Wide-Leg Pants', 'Palazzo', 'Skirt'],
     forbiddenBottomSubcategories: [
       'Dhoti',
       'Pajama',
@@ -120,8 +121,8 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
       'Gym Shorts',
       'Sweatpants',
     ],
-    preferredFootwearSubcategories: ['Sneakers', 'Boots'],
-    allowedFootwearSubcategories: ['Sneakers', 'Boots', 'Loafers'],
+    preferredFootwearSubcategories: ['Sneakers', 'Boots', 'Heels', 'Flats'],
+    allowedFootwearSubcategories: ['Sneakers', 'Boots', 'Loafers', 'Heels', 'Flats', 'Wedges', 'Slides'],
     forbiddenFootwearSubcategories: [
       'Sandals',
       'Kolhapuris',
@@ -130,16 +131,16 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
       'Formal Shoes',
       'Running Shoes',
     ],
-    allowedLayerSubcategories: ['Jacket', 'Bomber Jacket', 'Denim Jacket', 'Blazer', 'Overshirt'],
+    allowedLayerSubcategories: ['Jacket', 'Bomber Jacket', 'Denim Jacket', 'Blazer', 'Overshirt', 'Shrug'],
     forbiddenLayerSubcategories: ['Nehru Jacket'],
-    allowedAccessorySubcategories: ['Watch', 'Belt', 'Sunglasses', 'Bracelet', 'Ring', 'Cap'],
+    allowedAccessorySubcategories: ['Watch', 'Belt', 'Sunglasses', 'Bracelet', 'Ring', 'Cap', 'Handbag', 'Sling Bag', 'Jewellery', 'Earrings', 'Necklace'],
     forbiddenAccessorySubcategories: ['Tie', 'Pocket Square'],
     strictness: 'STRICT_HARD',
     maxAccessories: 3,
     description: 'Modern, classy, confident, social entertainment and night-out styling.',
     stylingTips: [
-      'Pair a clean party shirt or dark overshirt with relaxed/baggy jeans and fresh white sneakers.',
-      'Keep footwear fashionable: clean minimal sneakers, Chelsea boots, or modern loafers.',
+      'Pair a clean party shirt, stylish crop top, or dark overshirt with relaxed/baggy jeans or wide-leg pants.',
+      'Keep footwear fashionable: clean minimal sneakers, Chelsea boots, heels, or modern loafers.',
       'Never wear traditional ethnic wear (kurtas) or sandals to a modern party.',
     ],
   },
@@ -149,18 +150,18 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     name: 'Office / Workday',
     aliases: ['office', 'work', 'workplace', 'corporate', 'business', 'business casual'],
     formalityLevels: ['Formal', 'Semi-Formal', 'Smart Casual'],
-    preferredTopSubcategories: ['Shirt', 'Polo', 'Overshirt'],
-    allowedTopSubcategories: ['Shirt', 'Polo', 'Overshirt', 'Kurta'],
-    forbiddenTopSubcategories: ['Tank Top', 'Graphic T-Shirt', 'Distressed Hoodie', 'Sleeveless'],
-    preferredBottomSubcategories: ['Trousers', 'Formal Pants', 'Chinos'],
-    allowedBottomSubcategories: ['Trousers', 'Formal Pants', 'Chinos', 'Jeans'],
+    preferredTopSubcategories: ['Shirt', 'Polo', 'Overshirt', 'Blouse', 'Kurti'],
+    allowedTopSubcategories: ['Shirt', 'Polo', 'Overshirt', 'Kurta', 'Kurti', 'Blouse', 'Tunic', 'Peplum Top', 'Sweater'],
+    forbiddenTopSubcategories: ['Tank Top', 'Graphic T-Shirt', 'Distressed Hoodie'],
+    preferredBottomSubcategories: ['Trousers', 'Formal Pants', 'Chinos', 'Wide-Leg Pants'],
+    allowedBottomSubcategories: ['Trousers', 'Formal Pants', 'Chinos', 'Jeans', 'Wide-Leg Pants', 'Palazzo', 'Skirt', 'Culottes'],
     forbiddenBottomSubcategories: ['Track Pants', 'Shorts', 'Pajama', 'Gym Shorts'],
-    preferredFootwearSubcategories: ['Formal Shoes', 'Loafers'],
-    allowedFootwearSubcategories: ['Formal Shoes', 'Loafers', 'Sneakers', 'Boots'],
+    preferredFootwearSubcategories: ['Formal Shoes', 'Loafers', 'Flats', 'Heels'],
+    allowedFootwearSubcategories: ['Formal Shoes', 'Loafers', 'Sneakers', 'Boots', 'Flats', 'Heels', 'Wedges'],
     forbiddenFootwearSubcategories: ['Slippers', 'Flip-Flops', 'Running Shoes', 'Sandals'],
-    allowedLayerSubcategories: ['Blazer', 'Nehru Jacket', 'Sweater', 'Cardigan', 'Jacket'],
+    allowedLayerSubcategories: ['Blazer', 'Nehru Jacket', 'Sweater', 'Cardigan', 'Jacket', 'Shrug'],
     forbiddenLayerSubcategories: ['Windbreaker', 'Graphic Hoodie'],
-    allowedAccessorySubcategories: ['Belt', 'Watch', 'Bag', 'Tie', 'Pocket Square'],
+    allowedAccessorySubcategories: ['Belt', 'Watch', 'Bag', 'Handbag', 'Tote', 'Tie', 'Pocket Square', 'Jewellery', 'Earrings'],
     forbiddenAccessorySubcategories: ['Cap', 'Hat'],
     forbiddenPatterns: ['Graphic'],
     forbiddenMaterials: ['Terry / French Terry', 'Fleece'],
@@ -168,8 +169,8 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     maxAccessories: 2,
     description: 'Smart, sharp corporate dressing with practical comfort for long desk hours.',
     stylingTips: [
-      'Button-down shirts with chinos or dark trousers are timeless anchors.',
-      'Leather loafers or clean minimalist white/brown sneakers for smart-casual offices.',
+      'Button-down shirts, tailored blouses, or smart kurtis with chinos or trousers are timeless anchors.',
+      'Leather loafers, elegant flats, or clean minimalist sneakers for smart-casual offices.',
     ],
   },
 
@@ -178,25 +179,25 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     name: 'Presentation / Pitch',
     aliases: ['presentation', 'college presentation', 'formal presentation', 'pitch', 'client pitch', 'seminar', 'keynote'],
     formalityLevels: ['Formal', 'Semi-Formal', 'Smart Casual'],
-    preferredTopSubcategories: ['Shirt', 'Formal Shirt', 'Oxford Shirt'],
-    allowedTopSubcategories: ['Shirt', 'Formal Shirt', 'Oxford Shirt', 'Polo'],
+    preferredTopSubcategories: ['Shirt', 'Formal Shirt', 'Oxford Shirt', 'Blouse'],
+    allowedTopSubcategories: ['Shirt', 'Formal Shirt', 'Oxford Shirt', 'Blouse', 'Polo'],
     forbiddenTopSubcategories: ['T-Shirt', 'Sweatshirt', 'Hoodie', 'Tank Top', 'Kurta'],
-    preferredBottomSubcategories: ['Trousers', 'Formal Pants', 'Chinos'],
-    allowedBottomSubcategories: ['Trousers', 'Formal Pants', 'Chinos'],
+    preferredBottomSubcategories: ['Trousers', 'Formal Pants', 'Chinos', 'Wide-Leg Pants'],
+    allowedBottomSubcategories: ['Trousers', 'Formal Pants', 'Chinos', 'Wide-Leg Pants', 'Skirt'],
     forbiddenBottomSubcategories: ['Track Pants', 'Joggers', 'Shorts', 'Pajama', 'Ripped Jeans', 'Cargo Pants'],
-    preferredFootwearSubcategories: ['Formal Shoes', 'Loafers'],
-    allowedFootwearSubcategories: ['Formal Shoes', 'Loafers', 'Sneakers'],
+    preferredFootwearSubcategories: ['Formal Shoes', 'Loafers', 'Flats', 'Heels'],
+    allowedFootwearSubcategories: ['Formal Shoes', 'Loafers', 'Sneakers', 'Flats', 'Heels'],
     forbiddenFootwearSubcategories: ['Slippers', 'Flip-Flops', 'Sandals', 'Kolhapuris', 'Running Shoes'],
     allowedLayerSubcategories: ['Blazer', 'Nehru Jacket', 'Cardigan', 'Sweater'],
     forbiddenLayerSubcategories: ['Windbreaker', 'Distressed Denim Jacket'],
-    allowedAccessorySubcategories: ['Belt', 'Watch', 'Tie'],
+    allowedAccessorySubcategories: ['Belt', 'Watch', 'Tie', 'Handbag'],
     forbiddenAccessorySubcategories: ['Cap', 'Hat', 'Sunglasses'],
     forbiddenPatterns: ['Graphic'],
     strictness: 'STRICT_HARD',
     maxAccessories: 2,
     description: 'Authoritative, sharp, and confident. Focuses the audience on your ideas.',
     stylingTips: [
-      'Structure is key: a tailored shirt and dark trousers command attention.',
+      'Structure is key: a tailored shirt or blouse and dark trousers command attention.',
       'Keep accessories minimal so there are zero distractions on stage.',
     ],
   },
@@ -206,25 +207,25 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     name: 'Wedding / Festive Function',
     aliases: ['wedding', 'reception', 'sangeet', 'mehendi', 'baraat', 'engagement', 'haldi', 'marriage'],
     formalityLevels: ['Festive', 'Formal', 'Semi-Formal'],
-    preferredTopSubcategories: ['Kurta'],
-    allowedTopSubcategories: ['Kurta', 'Shirt', 'Formal Shirt'],
+    preferredTopSubcategories: ['Kurta', 'Saree', 'Kurti', 'Blouse'],
+    allowedTopSubcategories: ['Kurta', 'Sherwani', 'Saree', 'Kurti', 'Blouse', 'Shirt', 'Formal Shirt'],
     forbiddenTopSubcategories: ['T-Shirt', 'Polo', 'Tank Top', 'Hoodie', 'Sweatshirt', 'Overshirt'],
-    preferredBottomSubcategories: ['Trousers', 'Chinos', 'Dhoti', 'Pajama'],
-    allowedBottomSubcategories: ['Trousers', 'Chinos', 'Dhoti', 'Pajama', 'Formal Pants'],
+    preferredBottomSubcategories: ['Trousers', 'Chinos', 'Dhoti', 'Pajama', 'Palazzo', 'Salwar', 'Churidar', 'Sharara'],
+    allowedBottomSubcategories: ['Trousers', 'Chinos', 'Dhoti', 'Pajama', 'Formal Pants', 'Palazzo', 'Salwar', 'Churidar', 'Sharara'],
     forbiddenBottomSubcategories: ['Track Pants', 'Joggers', 'Shorts', 'Ripped Jeans', 'Cargo Pants'],
-    preferredFootwearSubcategories: ['Kolhapuris', 'Loafers', 'Formal Shoes'],
-    allowedFootwearSubcategories: ['Kolhapuris', 'Loafers', 'Formal Shoes', 'Sandals'],
+    preferredFootwearSubcategories: ['Kolhapuris', 'Juttis', 'Mojaris', 'Loafers', 'Formal Shoes', 'Heels', 'Flats'],
+    allowedFootwearSubcategories: ['Kolhapuris', 'Juttis', 'Mojaris', 'Loafers', 'Formal Shoes', 'Sandals', 'Heels', 'Flats', 'Wedges'],
     forbiddenFootwearSubcategories: ['Sneakers', 'Running Shoes', 'Sports Shoes', 'Slippers', 'Flip-Flops'],
-    allowedLayerSubcategories: ['Nehru Jacket', 'Blazer', 'Overcoat'],
+    allowedLayerSubcategories: ['Nehru Jacket', 'Blazer', 'Overcoat', 'Shrug'],
     forbiddenLayerSubcategories: ['Hoodie', 'Bomber Jacket', 'Windbreaker', 'Denim Jacket'],
-    allowedAccessorySubcategories: ['Watch', 'Pocket Square', 'Bracelet', 'Ring', 'Scarf'],
+    allowedAccessorySubcategories: ['Watch', 'Pocket Square', 'Bracelet', 'Ring', 'Scarf', 'Dupatta', 'Jewellery', 'Earrings', 'Necklace', 'Handbag', 'Sling Bag'],
     forbiddenAccessorySubcategories: ['Cap', 'Hat'],
     strictness: 'STRICT_HARD',
     maxAccessories: 3,
     description: 'Elevated contemporary Indian celebration wear. Rich textures, heritage palettes, celebratory elegance.',
     stylingTips: [
-      'A structured Kurta with Nehru Jacket or a rich Linen/Silk shirt shines at Indian weddings.',
-      'Pair with Kolhapuris or premium Leather Loafers.',
+      'A structured Kurta, Saree, or rich Silk/Linen piece shines at Indian celebrations.',
+      'Pair with Kolhapuris, Juttis, heels, or premium Leather Loafers.',
     ],
   },
 
@@ -233,21 +234,21 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     name: 'Festival / Traditional Puja',
     aliases: ['festival', 'traditional', 'puja', 'diwali', 'eid', 'navratri', 'onam', 'pongal', 'family function'],
     formalityLevels: ['Festive', 'Semi-Formal', 'Smart Casual'],
-    preferredTopSubcategories: ['Kurta'],
-    allowedTopSubcategories: ['Kurta', 'Shirt', 'Polo'],
+    preferredTopSubcategories: ['Kurta', 'Kurti', 'Saree', 'Blouse'],
+    allowedTopSubcategories: ['Kurta', 'Kurti', 'Saree', 'Shirt', 'Blouse', 'Polo', 'Tunic'],
     forbiddenTopSubcategories: ['Graphic T-Shirt', 'Tank Top', 'Hoodie', 'Sweatshirt'],
-    preferredBottomSubcategories: ['Chinos', 'Trousers', 'Pajama', 'Dhoti'],
-    allowedBottomSubcategories: ['Chinos', 'Trousers', 'Pajama', 'Dhoti', 'Jeans'],
+    preferredBottomSubcategories: ['Chinos', 'Trousers', 'Pajama', 'Dhoti', 'Palazzo', 'Salwar', 'Churidar'],
+    allowedBottomSubcategories: ['Chinos', 'Trousers', 'Pajama', 'Dhoti', 'Jeans', 'Palazzo', 'Salwar', 'Churidar', 'Sharara', 'Wide-Leg Pants'],
     forbiddenBottomSubcategories: ['Track Pants', 'Gym Shorts', 'Joggers'],
-    preferredFootwearSubcategories: ['Kolhapuris', 'Sandals', 'Loafers'],
-    allowedFootwearSubcategories: ['Kolhapuris', 'Sandals', 'Loafers', 'Formal Shoes'],
+    preferredFootwearSubcategories: ['Kolhapuris', 'Juttis', 'Mojaris', 'Sandals', 'Loafers', 'Flats', 'Heels'],
+    allowedFootwearSubcategories: ['Kolhapuris', 'Juttis', 'Mojaris', 'Sandals', 'Loafers', 'Formal Shoes', 'Flats', 'Heels', 'Wedges', 'Sneakers'],
     forbiddenFootwearSubcategories: ['Running Shoes', 'Sports Shoes', 'Slippers', 'Flip-Flops'],
-    allowedLayerSubcategories: ['Nehru Jacket', 'Cardigan'],
+    allowedLayerSubcategories: ['Nehru Jacket', 'Cardigan', 'Shrug'],
     forbiddenLayerSubcategories: ['Windbreaker', 'Distressed Jacket'],
-    allowedAccessorySubcategories: ['Watch', 'Bracelet', 'Scarf'],
+    allowedAccessorySubcategories: ['Watch', 'Bracelet', 'Scarf', 'Dupatta', 'Jewellery', 'Earrings', 'Necklace', 'Handbag', 'Sling Bag'],
     forbiddenAccessorySubcategories: ['Cap'],
     strictness: 'STRICT_HARD',
-    maxAccessories: 2,
+    maxAccessories: 3,
     description: 'Modern Indian traditional style celebrating cultural warmth and family moments.',
     stylingTips: [
       'Opt for vibrant or earthy palettes like mustard, olive, off-white, maroon, or navy.',
@@ -259,25 +260,25 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     name: 'Date / Evening Drinks',
     aliases: ['date', 'date night', 'first date', 'romantic dinner', 'cocktails', 'drinks'],
     formalityLevels: ['Smart Casual', 'Semi-Formal'],
-    preferredTopSubcategories: ['Shirt', 'Polo', 'Overshirt'],
-    allowedTopSubcategories: ['Shirt', 'Polo', 'Overshirt', 'T-Shirt', 'Sweater'],
+    preferredTopSubcategories: ['Shirt', 'Polo', 'Overshirt', 'Blouse', 'Crop Top'],
+    allowedTopSubcategories: ['Shirt', 'Polo', 'Overshirt', 'T-Shirt', 'Blouse', 'Crop Top', 'Kurti', 'Tunic', 'Sweater', 'Dress'],
     forbiddenTopSubcategories: ['Kurta', 'Tank Top', 'Graphic Sweatshirt', 'Gym Wear'],
-    preferredBottomSubcategories: ['Chinos', 'Jeans', 'Trousers'],
-    allowedBottomSubcategories: ['Chinos', 'Jeans', 'Trousers'],
+    preferredBottomSubcategories: ['Chinos', 'Jeans', 'Trousers', 'Wide-Leg Pants', 'Skirt'],
+    allowedBottomSubcategories: ['Chinos', 'Jeans', 'Trousers', 'Wide-Leg Pants', 'Palazzo', 'Skirt'],
     forbiddenBottomSubcategories: ['Track Pants', 'Joggers', 'Shorts', 'Pajama', 'Dhoti'],
-    preferredFootwearSubcategories: ['Loafers', 'Sneakers', 'Boots'],
-    allowedFootwearSubcategories: ['Loafers', 'Sneakers', 'Boots', 'Formal Shoes'],
+    preferredFootwearSubcategories: ['Loafers', 'Sneakers', 'Boots', 'Heels', 'Flats'],
+    allowedFootwearSubcategories: ['Loafers', 'Sneakers', 'Boots', 'Formal Shoes', 'Heels', 'Flats', 'Wedges'],
     forbiddenFootwearSubcategories: ['Slippers', 'Flip-Flops', 'Sandals', 'Kolhapuris', 'Running Shoes'],
-    allowedLayerSubcategories: ['Blazer', 'Jacket', 'Bomber Jacket', 'Denim Jacket', 'Sweater', 'Cardigan'],
+    allowedLayerSubcategories: ['Blazer', 'Jacket', 'Bomber Jacket', 'Denim Jacket', 'Sweater', 'Cardigan', 'Shrug'],
     forbiddenLayerSubcategories: ['Windbreaker', 'Track Jacket'],
-    allowedAccessorySubcategories: ['Watch', 'Belt', 'Sunglasses', 'Bracelet'],
+    allowedAccessorySubcategories: ['Watch', 'Belt', 'Sunglasses', 'Bracelet', 'Handbag', 'Sling Bag', 'Jewellery', 'Earrings'],
     forbiddenAccessorySubcategories: ['Cap', 'Hat'],
     forbiddenPatterns: ['Graphic'],
     strictness: 'STRICT_HARD',
     maxAccessories: 2,
     description: 'Effortless, flattering, and alluring. Subtle sophistication without over-trying.',
     stylingTips: [
-      'A fitted Oxford shirt or knit polo with clean chinos and dark loafers creates an irresistible silhouette.',
+      'A fitted shirt, silk blouse, or knit polo with clean trousers/denim creates an irresistible silhouette.',
     ],
   },
 
@@ -286,18 +287,18 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     name: 'Fine Dining / Evening Dinner',
     aliases: ['dinner', 'family dinner', 'restaurant', 'fine dining', 'formal dinner'],
     formalityLevels: ['Semi-Formal', 'Smart Casual', 'Formal'],
-    preferredTopSubcategories: ['Shirt', 'Polo', 'Sweater'],
-    allowedTopSubcategories: ['Shirt', 'Polo', 'Sweater', 'Overshirt'],
-    forbiddenTopSubcategories: ['Kurta', 'Tank Top', 'Graphic T-Shirt', 'Hoodie'],
-    preferredBottomSubcategories: ['Trousers', 'Chinos'],
-    allowedBottomSubcategories: ['Trousers', 'Chinos', 'Jeans'],
+    preferredTopSubcategories: ['Shirt', 'Polo', 'Blouse', 'Kurti', 'Sweater'],
+    allowedTopSubcategories: ['Shirt', 'Polo', 'Sweater', 'Overshirt', 'Blouse', 'Kurti', 'Kurta', 'Tunic', 'Dress'],
+    forbiddenTopSubcategories: ['Tank Top', 'Graphic T-Shirt', 'Hoodie'],
+    preferredBottomSubcategories: ['Trousers', 'Chinos', 'Wide-Leg Pants', 'Palazzo'],
+    allowedBottomSubcategories: ['Trousers', 'Chinos', 'Jeans', 'Wide-Leg Pants', 'Palazzo', 'Skirt'],
     forbiddenBottomSubcategories: ['Track Pants', 'Shorts', 'Joggers', 'Pajama', 'Dhoti'],
-    preferredFootwearSubcategories: ['Loafers', 'Formal Shoes', 'Boots'],
-    allowedFootwearSubcategories: ['Loafers', 'Formal Shoes', 'Boots', 'Sneakers'],
+    preferredFootwearSubcategories: ['Loafers', 'Formal Shoes', 'Boots', 'Heels', 'Flats'],
+    allowedFootwearSubcategories: ['Loafers', 'Formal Shoes', 'Boots', 'Sneakers', 'Heels', 'Flats', 'Wedges'],
     forbiddenFootwearSubcategories: ['Slippers', 'Flip-Flops', 'Sandals', 'Kolhapuris', 'Running Shoes'],
-    allowedLayerSubcategories: ['Blazer', 'Jacket', 'Cardigan', 'Sweater'],
+    allowedLayerSubcategories: ['Blazer', 'Jacket', 'Cardigan', 'Sweater', 'Shrug'],
     forbiddenLayerSubcategories: ['Windbreaker'],
-    allowedAccessorySubcategories: ['Watch', 'Belt', 'Pocket Square'],
+    allowedAccessorySubcategories: ['Watch', 'Belt', 'Pocket Square', 'Handbag', 'Sling Bag', 'Jewellery', 'Earrings'],
     forbiddenAccessorySubcategories: ['Cap'],
     strictness: 'STRICT_HARD',
     maxAccessories: 2,
@@ -312,24 +313,24 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     name: 'College / Campus Day',
     aliases: ['college', 'campus', 'university', 'classes', 'lectures'],
     formalityLevels: ['Casual', 'Smart Casual'],
-    preferredTopSubcategories: ['T-Shirt', 'Polo', 'Shirt', 'Hoodie'],
-    allowedTopSubcategories: ['T-Shirt', 'Polo', 'Shirt', 'Overshirt', 'Hoodie', 'Sweatshirt'],
-    forbiddenTopSubcategories: ['Kurta', 'Sherwani', 'Tank Top', 'Formal Dress Shirt'],
-    preferredBottomSubcategories: ['Jeans', 'Cargo Pants', 'Chinos'],
-    allowedBottomSubcategories: ['Jeans', 'Chinos', 'Cargo Pants', 'Joggers', 'Trousers'],
+    preferredTopSubcategories: ['T-Shirt', 'Polo', 'Shirt', 'Crop Top', 'Kurti', 'Hoodie'],
+    allowedTopSubcategories: ['T-Shirt', 'Polo', 'Shirt', 'Overshirt', 'Crop Top', 'Kurti', 'Hoodie', 'Sweatshirt', 'Tank Top'],
+    forbiddenTopSubcategories: ['Sherwani', 'Formal Tuxedo Shirt'],
+    preferredBottomSubcategories: ['Jeans', 'Cargo Pants', 'Chinos', 'Wide-Leg Pants'],
+    allowedBottomSubcategories: ['Jeans', 'Chinos', 'Cargo Pants', 'Wide-Leg Pants', 'Palazzo', 'Joggers', 'Skirt', 'Track Pants', 'Trousers'],
     forbiddenBottomSubcategories: ['Pajama', 'Dhoti', 'Formal Suit Pants'],
-    preferredFootwearSubcategories: ['Sneakers', 'Running Shoes'],
-    allowedFootwearSubcategories: ['Sneakers', 'Running Shoes', 'Loafers', 'Sandals', 'Boots'],
-    forbiddenFootwearSubcategories: ['Flip-Flops', 'Slippers', 'Formal Shoes'],
-    allowedLayerSubcategories: ['Denim Jacket', 'Hoodie', 'Sweatshirt', 'Bomber Jacket', 'Windbreaker'],
+    preferredFootwearSubcategories: ['Sneakers', 'Running Shoes', 'Flats'],
+    allowedFootwearSubcategories: ['Sneakers', 'Running Shoes', 'Loafers', 'Sandals', 'Flats', 'Slides', 'Boots'],
+    forbiddenFootwearSubcategories: ['Flip-Flops', 'Formal Shoes'],
+    allowedLayerSubcategories: ['Denim Jacket', 'Hoodie', 'Sweatshirt', 'Bomber Jacket', 'Windbreaker', 'Shrug'],
     forbiddenLayerSubcategories: ['Tuxedo Blazer', 'Nehru Jacket'],
-    allowedAccessorySubcategories: ['Watch', 'Cap', 'Bag', 'Sunglasses'],
+    allowedAccessorySubcategories: ['Watch', 'Cap', 'Bag', 'Tote', 'Sling Bag', 'Sunglasses', 'Minimal Jewellery'],
     forbiddenAccessorySubcategories: ['Tie'],
     strictness: 'STRICT_HARD',
     maxAccessories: 2,
     description: 'Youthful, comfortable, stylish daily campus rotation.',
     stylingTips: [
-      'Combine breathable cotton tees with straight-fit jeans or cargos and fresh sneakers.',
+      'Combine breathable cotton tees, crop tops, or casual shirts with straight-fit/baggy jeans and fresh sneakers.',
     ],
   },
 
@@ -338,24 +339,24 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     name: 'Casual Outing / Weekend',
     aliases: ['casual outing', 'casual', 'weekend', 'brunch', 'coffee', 'hanging out', 'mall', 'shopping'],
     formalityLevels: ['Casual', 'Smart Casual'],
-    preferredTopSubcategories: ['T-Shirt', 'Polo', 'Shirt', 'Overshirt'],
-    allowedTopSubcategories: ['T-Shirt', 'Polo', 'Shirt', 'Overshirt', 'Hoodie'],
-    forbiddenTopSubcategories: ['Kurta', 'Sherwani'],
-    preferredBottomSubcategories: ['Jeans', 'Chinos', 'Cargo Pants'],
-    allowedBottomSubcategories: ['Jeans', 'Chinos', 'Cargo Pants', 'Shorts', 'Joggers'],
+    preferredTopSubcategories: ['T-Shirt', 'Polo', 'Shirt', 'Overshirt', 'Crop Top', 'Kurti', 'Blouse'],
+    allowedTopSubcategories: ['T-Shirt', 'Polo', 'Shirt', 'Overshirt', 'Crop Top', 'Kurti', 'Blouse', 'Tank Top', 'Hoodie', 'Sweater'],
+    forbiddenTopSubcategories: ['Sherwani'],
+    preferredBottomSubcategories: ['Jeans', 'Chinos', 'Cargo Pants', 'Wide-Leg Pants', 'Palazzo'],
+    allowedBottomSubcategories: ['Jeans', 'Chinos', 'Cargo Pants', 'Shorts', 'Wide-Leg Pants', 'Palazzo', 'Skirt', 'Joggers'],
     forbiddenBottomSubcategories: ['Pajama', 'Dhoti'],
-    preferredFootwearSubcategories: ['Sneakers', 'Loafers'],
-    allowedFootwearSubcategories: ['Sneakers', 'Loafers', 'Sandals', 'Running Shoes', 'Boots'],
+    preferredFootwearSubcategories: ['Sneakers', 'Loafers', 'Flats', 'Sandals'],
+    allowedFootwearSubcategories: ['Sneakers', 'Loafers', 'Sandals', 'Flats', 'Slides', 'Boots', 'Running Shoes', 'Heels'],
     forbiddenFootwearSubcategories: ['Flip-Flops'],
-    allowedLayerSubcategories: ['Denim Jacket', 'Bomber Jacket', 'Overshirt', 'Windbreaker', 'Cardigan'],
+    allowedLayerSubcategories: ['Denim Jacket', 'Bomber Jacket', 'Overshirt', 'Windbreaker', 'Cardigan', 'Shrug'],
     forbiddenLayerSubcategories: ['Tuxedo Blazer'],
-    allowedAccessorySubcategories: ['Watch', 'Sunglasses', 'Cap', 'Belt', 'Bag'],
+    allowedAccessorySubcategories: ['Watch', 'Sunglasses', 'Cap', 'Belt', 'Bag', 'Handbag', 'Sling Bag', 'Tote', 'Jewellery', 'Earrings'],
     forbiddenAccessorySubcategories: ['Tie'],
     strictness: 'STRICT_HARD',
     maxAccessories: 3,
     description: 'Relaxed, effortlessly put-together weekend aesthetics.',
     stylingTips: [
-      'Elevate a basic tee by adding a lightweight overshirt and tailored shorts or chinos.',
+      'Elevate a basic top by adding a lightweight overshirt, jacket, or minimal jewellery with wide-leg pants or denim.',
     ],
   },
 
@@ -364,24 +365,24 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     name: 'Travel / Airport / Road Trip',
     aliases: ['travel', 'airport', 'flight', 'road trip', 'vacation', 'commute'],
     formalityLevels: ['Casual', 'Smart Casual'],
-    preferredTopSubcategories: ['T-Shirt', 'Overshirt', 'Hoodie'],
-    allowedTopSubcategories: ['T-Shirt', 'Overshirt', 'Polo', 'Hoodie', 'Sweatshirt', 'Shirt'],
-    forbiddenTopSubcategories: ['Formal Dress Shirt', 'Kurta'],
-    preferredBottomSubcategories: ['Joggers', 'Cargo Pants', 'Chinos', 'Jeans'],
-    allowedBottomSubcategories: ['Joggers', 'Cargo Pants', 'Chinos', 'Jeans', 'Track Pants', 'Shorts'],
+    preferredTopSubcategories: ['T-Shirt', 'Overshirt', 'Hoodie', 'Kurti', 'Crop Top'],
+    allowedTopSubcategories: ['T-Shirt', 'Overshirt', 'Polo', 'Hoodie', 'Sweatshirt', 'Shirt', 'Kurti', 'Crop Top', 'Tank Top'],
+    forbiddenTopSubcategories: ['Formal Dress Shirt', 'Sherwani'],
+    preferredBottomSubcategories: ['Joggers', 'Cargo Pants', 'Chinos', 'Jeans', 'Wide-Leg Pants', 'Palazzo', 'Leggings'],
+    allowedBottomSubcategories: ['Joggers', 'Cargo Pants', 'Chinos', 'Jeans', 'Track Pants', 'Shorts', 'Wide-Leg Pants', 'Palazzo', 'Leggings'],
     forbiddenBottomSubcategories: ['Formal Wool Trousers', 'Dhoti'],
-    preferredFootwearSubcategories: ['Sneakers', 'Running Shoes'],
-    allowedFootwearSubcategories: ['Sneakers', 'Running Shoes', 'Loafers', 'Boots'],
-    forbiddenFootwearSubcategories: ['Stiff Formal Shoes', 'Kolhapuris', 'Flip-Flops'],
-    allowedLayerSubcategories: ['Jacket', 'Hoodie', 'Windbreaker', 'Bomber Jacket', 'Cardigan'],
+    preferredFootwearSubcategories: ['Sneakers', 'Running Shoes', 'Flats', 'Slides'],
+    allowedFootwearSubcategories: ['Sneakers', 'Running Shoes', 'Loafers', 'Boots', 'Flats', 'Slides'],
+    forbiddenFootwearSubcategories: ['Stiff Formal Shoes', 'Kolhapuris', 'Flip-Flops', 'High Heels'],
+    allowedLayerSubcategories: ['Jacket', 'Hoodie', 'Windbreaker', 'Bomber Jacket', 'Cardigan', 'Shrug'],
     forbiddenLayerSubcategories: ['Formal Blazer', 'Nehru Jacket'],
-    allowedAccessorySubcategories: ['Watch', 'Cap', 'Sunglasses', 'Bag'],
+    allowedAccessorySubcategories: ['Watch', 'Cap', 'Sunglasses', 'Bag', 'Tote', 'Sling Bag'],
     forbiddenAccessorySubcategories: [],
     strictness: 'STRICT_HARD',
     maxAccessories: 3,
     description: 'High mobility, comfort, functional layers for cabin air conditioning and transit.',
     stylingTips: [
-      'Layer a soft zip hoodie or overshirt over a moisture-wicking tee with stretch chinos or joggers.',
+      'Layer a soft zip hoodie or overshirt over a moisture-wicking tee with stretch chinos, joggers, or wide-leg pants.',
     ],
   },
 
@@ -390,15 +391,15 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     name: 'Gym / Workout / Sports',
     aliases: ['gym', 'workout', 'sports', 'running', 'fitness', 'training', 'football', 'badminton'],
     formalityLevels: ['Casual'],
-    preferredTopSubcategories: ['T-Shirt', 'Tank Top'],
-    allowedTopSubcategories: ['T-Shirt', 'Tank Top', 'Sweatshirt', 'Hoodie'],
-    forbiddenTopSubcategories: ['Shirt', 'Kurta', 'Polo', 'Blazer', 'Overshirt'],
-    preferredBottomSubcategories: ['Track Pants', 'Shorts', 'Joggers'],
-    allowedBottomSubcategories: ['Track Pants', 'Shorts', 'Joggers'],
-    forbiddenBottomSubcategories: ['Jeans', 'Trousers', 'Chinos', 'Dhoti', 'Pajama', 'Cargo Pants'],
+    preferredTopSubcategories: ['T-Shirt', 'Tank Top', 'Crop Top'],
+    allowedTopSubcategories: ['T-Shirt', 'Tank Top', 'Sweatshirt', 'Hoodie', 'Crop Top'],
+    forbiddenTopSubcategories: ['Shirt', 'Kurta', 'Polo', 'Blazer', 'Overshirt', 'Blouse'],
+    preferredBottomSubcategories: ['Track Pants', 'Shorts', 'Joggers', 'Leggings'],
+    allowedBottomSubcategories: ['Track Pants', 'Shorts', 'Joggers', 'Leggings'],
+    forbiddenBottomSubcategories: ['Jeans', 'Trousers', 'Chinos', 'Dhoti', 'Pajama', 'Cargo Pants', 'Skirt'],
     preferredFootwearSubcategories: ['Running Shoes', 'Sports Shoes'],
     allowedFootwearSubcategories: ['Running Shoes', 'Sports Shoes', 'Sneakers'],
-    forbiddenFootwearSubcategories: ['Formal Shoes', 'Loafers', 'Kolhapuris', 'Sandals', 'Boots', 'Slippers'],
+    forbiddenFootwearSubcategories: ['Formal Shoes', 'Loafers', 'Kolhapuris', 'Sandals', 'Boots', 'Slippers', 'Heels'],
     allowedLayerSubcategories: ['Windbreaker', 'Hoodie', 'Sweatshirt'],
     forbiddenLayerSubcategories: ['Blazer', 'Nehru Jacket', 'Denim Jacket'],
     allowedAccessorySubcategories: ['Watch', 'Cap'],
@@ -407,7 +408,7 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     maxAccessories: 2,
     description: 'High-performance athletic gear prioritizing sweat resistance and range of motion.',
     stylingTips: [
-      'Breathable athletic tee with flexible shorts/track pants and responsive running shoes.',
+      'Breathable athletic tee or tank with flexible shorts/leggings/track pants and responsive running shoes.',
     ],
   },
 
@@ -416,16 +417,16 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     name: 'Home / Lounging',
     aliases: ['home', 'lounging', 'chill', 'remote work', 'wfh'],
     formalityLevels: ['Casual'],
-    preferredTopSubcategories: ['T-Shirt', 'Tank Top', 'Hoodie'],
-    allowedTopSubcategories: ['T-Shirt', 'Tank Top', 'Hoodie', 'Sweatshirt'],
-    forbiddenTopSubcategories: ['Formal Shirt', 'Blazer', 'Kurta'],
-    preferredBottomSubcategories: ['Shorts', 'Track Pants', 'Pajama'],
-    allowedBottomSubcategories: ['Shorts', 'Track Pants', 'Pajama', 'Joggers'],
+    preferredTopSubcategories: ['T-Shirt', 'Tank Top', 'Hoodie', 'Crop Top', 'Kurti'],
+    allowedTopSubcategories: ['T-Shirt', 'Tank Top', 'Hoodie', 'Sweatshirt', 'Crop Top', 'Kurti'],
+    forbiddenTopSubcategories: ['Formal Shirt', 'Blazer'],
+    preferredBottomSubcategories: ['Shorts', 'Track Pants', 'Pajama', 'Leggings', 'Palazzo'],
+    allowedBottomSubcategories: ['Shorts', 'Track Pants', 'Pajama', 'Joggers', 'Leggings', 'Palazzo'],
     forbiddenBottomSubcategories: ['Formal Trousers', 'Formal Pants'],
-    preferredFootwearSubcategories: ['Slippers', 'Flip-Flops', 'Sandals'],
-    allowedFootwearSubcategories: ['Slippers', 'Flip-Flops', 'Sandals'],
-    forbiddenFootwearSubcategories: ['Formal Shoes', 'Boots', 'Loafers'],
-    allowedLayerSubcategories: ['Hoodie', 'Cardigan'],
+    preferredFootwearSubcategories: ['Slippers', 'Flip-Flops', 'Sandals', 'Slides'],
+    allowedFootwearSubcategories: ['Slippers', 'Flip-Flops', 'Sandals', 'Slides'],
+    forbiddenFootwearSubcategories: ['Formal Shoes', 'Boots', 'Loafers', 'Heels'],
+    allowedLayerSubcategories: ['Hoodie', 'Cardigan', 'Shrug'],
     forbiddenLayerSubcategories: ['Blazer'],
     allowedAccessorySubcategories: [],
     forbiddenAccessorySubcategories: ['Tie', 'Pocket Square'],
@@ -433,7 +434,7 @@ export const OCCASION_RULES: Record<string, OccasionRule> = {
     maxAccessories: 1,
     description: 'Ultimate relaxed comfort.',
     stylingTips: [
-      'Ultra-soft cotton t-shirt with breathable shorts or relaxed track pants.',
+      'Ultra-soft cotton t-shirt or kurti with breathable shorts, leggings, or relaxed track pants.',
     ],
   },
 };
@@ -474,24 +475,36 @@ export function getOccasionRule(rawOccasion: string): OccasionRule {
 }
 
 /**
- * Canonical Subcategory Normalizer
+ * Canonical Subcategory Normalizer with Gender-Neutral and Indian Fashion Taxonomies
  */
 export function normalizeSubcategory(sub?: string): string {
   if (!sub) return 'Other';
   const s = sub.trim().toLowerCase().replace(/[-_]/g, ' ');
 
-  // Tops
+  // Tops & One-Pieces
+  if (s.includes('crop top') || s.includes('croptop') || s.includes('crop tee')) return 'Crop Top';
+  if (s.includes('blouse') || s.includes('formal blouse')) return 'Blouse';
+  if (s.includes('peplum')) return 'Peplum Top';
+  if (s.includes('tunic')) return 'Tunic';
+  if (s.includes('kurti')) return 'Kurti';
+  if (s.includes('kurta') || s.includes('sherwani') || s.includes('anarkali')) return 'Kurta';
+  if (s.includes('saree') || s.includes('sari')) return 'Saree';
+  if (s.includes('dress') || s.includes('maxi') || s.includes('midi') || s.includes('jumpsuit')) return 'Dress';
+  if (s.includes('tank') || s.includes('sleeveless') || s.includes('camisole') || s.includes('cami')) return 'Tank Top';
   if (s.includes('t shirt') || s.includes('tshirt') || s.includes('tee')) return 'T-Shirt';
   if (s.includes('polo')) return 'Polo';
-  if (s.includes('kurta') || s.includes('sherwani') || s.includes('kurti')) return 'Kurta';
   if (s.includes('overshirt')) return 'Overshirt';
   if (s.includes('henley')) return 'Henley';
-  if (s.includes('tank') || s.includes('sleeveless') || s.includes('vest')) return 'Tank Top';
   if (s.includes('sweatshirt')) return 'Sweatshirt';
   if (s.includes('hoodie')) return 'Hoodie';
   if (s.includes('shirt')) return 'Shirt';
 
   // Bottoms
+  if (s.includes('wide leg') || s.includes('wideleg') || s.includes('flared')) return 'Wide-Leg Pants';
+  if (s.includes('palazzo') || s.includes('sharara') || s.includes('culotte')) return 'Palazzo';
+  if (s.includes('skirt')) return 'Skirt';
+  if (s.includes('salwar') || s.includes('patiala')) return 'Salwar';
+  if (s.includes('churidar') || s.includes('legging')) return 'Churidar';
   if (s.includes('track') || s.includes('sweatpant')) return 'Track Pants';
   if (s.includes('jogger')) return 'Joggers';
   if (s.includes('cargo')) return 'Cargo Pants';
@@ -503,6 +516,10 @@ export function normalizeSubcategory(sub?: string): string {
   if (s.includes('pajama') || s.includes('pyjama')) return 'Pajama';
 
   // Footwear
+  if (s.includes('heel') || s.includes('stiletto') || s.includes('pump') || s.includes('block heel')) return 'Heels';
+  if (s.includes('flat') || s.includes('ballerina') || s.includes('mule')) return 'Flats';
+  if (s.includes('jutti') || s.includes('mojari') || s.includes('mojri')) return 'Juttis';
+  if (s.includes('wedge')) return 'Wedges';
   if (s.includes('formal shoe') || s.includes('oxford') || s.includes('derby') || s.includes('brogue') || s.includes('monk')) return 'Formal Shoes';
   if (s.includes('loafer') || s.includes('moccasin')) return 'Loafers';
   if (s.includes('sneaker') || s.includes('trainer')) return 'Sneakers';
@@ -513,15 +530,24 @@ export function normalizeSubcategory(sub?: string): string {
   if (s.includes('slipper') || s.includes('flip flop') || s.includes('slide')) return 'Slippers';
 
   // Layers
+  if (s.includes('shrug')) return 'Shrug';
   if (s.includes('blazer') || s.includes('suit jacket')) return 'Blazer';
-  if (s.includes('nehru') || s.includes('waistcoat')) return 'Nehru Jacket';
-  if (s.includes('sweater') || s.includes('cardigan') || s.includes('pullover')) return 'Sweater';
+  if (s.includes('nehru') || s.includes('waistcoat') || s.includes('bandi')) return 'Nehru Jacket';
+  if (s.includes('cardigan')) return 'Cardigan';
+  if (s.includes('sweater') || s.includes('pullover')) return 'Sweater';
   if (s.includes('bomber')) return 'Bomber Jacket';
   if (s.includes('windbreaker')) return 'Windbreaker';
   if (s.includes('jacket')) return 'Jacket';
-  if (s.includes('coat') || s.includes('overcoat')) return 'Overcoat';
+  if (s.includes('coat') || s.includes('overcoat') || s.includes('trench')) return 'Overcoat';
 
   // Accessories
+  if (s.includes('handbag') || s.includes('tote') || s.includes('purse')) return 'Handbag';
+  if (s.includes('sling') || s.includes('crossbody')) return 'Sling Bag';
+  if (s.includes('earring') || s.includes('jhumka') || s.includes('stud')) return 'Earrings';
+  if (s.includes('necklace') || s.includes('chain') || s.includes('choker') || s.includes('pendant')) return 'Necklace';
+  if (s.includes('jewel') || s.includes('bangle') || s.includes('kangan')) return 'Jewellery';
+  if (s.includes('dupatta') || s.includes('chunni') || s.includes('stole')) return 'Dupatta';
+  if (s.includes('scarf')) return 'Scarf';
   if (s.includes('watch')) return 'Watch';
   if (s.includes('belt')) return 'Belt';
   if (s.includes('sunglass') || s.includes('glass')) return 'Sunglasses';
@@ -530,9 +556,8 @@ export function normalizeSubcategory(sub?: string): string {
   if (s.includes('pocket square')) return 'Pocket Square';
   if (s.includes('bag') || s.includes('backpack') || s.includes('briefcase')) return 'Bag';
   if (s.includes('wallet')) return 'Wallet';
-  if (s.includes('bracelet') || s.includes('band')) return 'Bracelet';
+  if (s.includes('bracelet') || s.includes('band') || s.includes('kada')) return 'Bracelet';
   if (s.includes('ring')) return 'Ring';
-  if (s.includes('scarf')) return 'Scarf';
 
   return 'Other';
 }

@@ -1,12 +1,95 @@
 export type MainCategory = 'tops' | 'bottoms' | 'layers' | 'footwear' | 'accessories';
 
-export type TopSubcategory = 'shirt' | 't-shirt' | 'polo' | 'overshirt' | 'kurta' | 'other_top';
-export type BottomSubcategory = 'jeans' | 'trousers' | 'chinos' | 'shorts' | 'track_pants' | 'ethnic_bottom';
-export type LayerSubcategory = 'jacket' | 'hoodie' | 'sweater' | 'blazer' | 'vest' | 'nehru_jacket';
-export type FootwearSubcategory = 'sneakers' | 'formal_shoes' | 'loafers' | 'sandals' | 'slippers' | 'boots' | 'kolhapuris';
-export type AccessorySubcategory = 'watch' | 'belt' | 'sunglasses' | 'cap' | 'bracelet' | 'bag' | 'perfume' | 'other';
+export type TopSubcategory =
+  | 'shirt'
+  | 't-shirt'
+  | 'polo'
+  | 'overshirt'
+  | 'kurta'
+  | 'kurti'
+  | 'blouse'
+  | 'crop_top'
+  | 'tunic'
+  | 'tank_top'
+  | 'camisole'
+  | 'peplum_top'
+  | 'sweater'
+  | 'dress'
+  | 'saree'
+  | 'other_top';
 
-export type Subcategory = TopSubcategory | BottomSubcategory | LayerSubcategory | FootwearSubcategory | AccessorySubcategory;
+export type BottomSubcategory =
+  | 'jeans'
+  | 'trousers'
+  | 'chinos'
+  | 'shorts'
+  | 'track_pants'
+  | 'wide_leg_pants'
+  | 'palazzo'
+  | 'skirt'
+  | 'culottes'
+  | 'cargo_pants'
+  | 'salwar'
+  | 'churidar'
+  | 'leggings'
+  | 'sharara'
+  | 'dhoti'
+  | 'pajama'
+  | 'ethnic_bottom';
+
+export type LayerSubcategory =
+  | 'jacket'
+  | 'hoodie'
+  | 'sweater'
+  | 'blazer'
+  | 'vest'
+  | 'shrug'
+  | 'cardigan'
+  | 'coat'
+  | 'nehru_jacket'
+  | 'bomber_jacket'
+  | 'denim_jacket';
+
+export type FootwearSubcategory =
+  | 'sneakers'
+  | 'formal_shoes'
+  | 'loafers'
+  | 'sandals'
+  | 'slippers'
+  | 'boots'
+  | 'kolhapuris'
+  | 'heels'
+  | 'flats'
+  | 'juttis'
+  | 'mojaris'
+  | 'wedges'
+  | 'slides';
+
+export type AccessorySubcategory =
+  | 'watch'
+  | 'belt'
+  | 'sunglasses'
+  | 'cap'
+  | 'bracelet'
+  | 'bag'
+  | 'handbag'
+  | 'sling_bag'
+  | 'tote'
+  | 'earrings'
+  | 'necklace'
+  | 'jewellery'
+  | 'scarf'
+  | 'dupatta'
+  | 'ring'
+  | 'perfume'
+  | 'other';
+
+export type Subcategory =
+  | TopSubcategory
+  | BottomSubcategory
+  | LayerSubcategory
+  | FootwearSubcategory
+  | AccessorySubcategory;
 
 export type OccasionType =
   | 'College'
@@ -68,8 +151,8 @@ export interface WardrobeItem {
   style?: string; // Smart Casual, Minimal, Casual, Formal, Ethnic, Streetwear
   formality?: 'Casual' | 'Smart Casual' | 'Semi-Formal' | 'Formal' | 'Festive';
   season?: string[]; // Summer, Monsoon, Winter, All-Season, Spring
-  is_favorite: boolean;
-  is_archived: boolean;
+  is_favorite?: boolean;
+  is_archived?: boolean;
   times_worn: number;
   last_worn_at?: string | null;
   created_at: string;
@@ -116,6 +199,33 @@ export interface CustomOccasionContext {
   specialRequirements?: string[];
 }
 
+export interface OutfitScoreBreakdown {
+  color_harmony: number; // 0 to 10
+  style_cohesion: number; // 0 to 10
+  fit_and_proportion: number; // 0 to 10
+  occasion_fit: number; // 0 to 10
+  footwear_compatibility: number; // 0 to 10
+  accessory_balance: number; // 0 to 10
+}
+
+export interface OutfitSuggestionAlternative {
+  type: 'KEEP' | 'IMPROVE' | 'ELEVATE' | 'CASUAL' | 'FORMAL';
+  title: string;
+  description: string;
+  swapped_item?: WardrobeItem | null;
+  target_role?: ItemRole;
+}
+
+export interface SelfStyledAnalysis {
+  overall_score: number; // out of 10 e.g. 8.4
+  breakdown: OutfitScoreBreakdown;
+  verdict: string; // e.g. "Polished Contemporary"
+  what_works: string;
+  how_to_improve: string;
+  wardrobe_alternatives: OutfitSuggestionAlternative[];
+  occasion?: string;
+}
+
 export interface Outfit {
   id: string;
   user_id: string;
@@ -133,6 +243,8 @@ export interface Outfit {
   items: OutfitItemReference[];
   alternative_looks?: AlternativeLook[];
   missing_item?: MissingItemSuggestion | null;
+  is_self_styled?: boolean;
+  self_styled_analysis?: SelfStyledAnalysis | null;
   created_at: string;
   worn?: boolean;
 }

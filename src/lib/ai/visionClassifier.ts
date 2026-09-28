@@ -97,17 +97,17 @@ MANDATORY TAXONOMY RULES:
    - "Brown Leather Loafers"
    NEVER use generic filenames, camera IDs, or technical names.
 2. "category": Must be strictly one of: ["tops", "bottoms", "layers", "footwear", "accessories"].
-   - accessories: Watches, Belts, Sunglasses, Bags, Caps, Hats, Wallets, Ties, Scarves, Jewelry, Pocket Squares
-   - footwear: Sneakers, Running Shoes, Formal Shoes, Loafers, Boots, Sandals, Kolhapuris, Slippers
-   - bottoms: Jeans, Chinos, Trousers, Formal Pants, Cargo Pants, Shorts, Track Pants, Joggers
-   - layers: Jackets, Blazers, Bomber Jackets, Denim Jackets, Sweaters, Cardigans, Hoodies, Coats, Overcoats
-   - tops: T-Shirts, Shirts, Polos, Kurtas, Overshirts, Henleys, Tank Tops, Sweatshirts
+   - accessories: Watches, Belts, Handbags, Sling Bags, Totes, Sunglasses, Earrings, Necklaces, Bracelets, Jewellery, Scarves, Dupattas, Caps, Rings, Ties
+   - footwear: Sneakers, Heels, Flats, Loafers, Formal Shoes, Sandals, Boots, Juttis, Mojaris, Wedges, Slides, Running Shoes, Kolhapuris, Slippers
+   - bottoms: Jeans, Trousers, Wide-Leg Pants, Palazzos, Chinos, Formal Pants, Skirts, Shorts, Culottes, Cargo Pants, Salwars, Churidars, Leggings, Shararas, Track Pants, Joggers, Dhotis, Pajamas
+   - layers: Blazers, Jackets, Cardigans, Shrugs, Bomber Jackets, Denim Jackets, Sweaters, Coats, Overshirts, Nehru Jackets, Windbreakers, Hoodies
+   - tops: T-Shirts, Shirts, Blouses, Crop Tops, Kurtis, Kurtas, Tunics, Polos, Overshirts, Sweaters, Peplum Tops, Tank Tops, Camisoles, Henleys, Sweatshirts, Hoodies, Dresses, Sarees
 3. "subcategory": Must strictly match the chosen category from this list:
-   - accessories: ["Watch", "Belt", "Sunglasses", "Cap", "Hat", "Wallet", "Bag", "Bracelet", "Ring", "Tie", "Pocket Square", "Scarf", "Other"]
-   - footwear: ["Sneakers", "Running Shoes", "Formal Shoes", "Loafers", "Boots", "Sandals", "Kolhapuris", "Slippers", "Flip-Flops", "Sports Shoes", "Other"]
-   - bottoms: ["Jeans", "Chinos", "Trousers", "Formal Pants", "Cargo Pants", "Track Pants", "Shorts", "Joggers", "Dhoti", "Pajama", "Other"]
-   - layers: ["Jacket", "Blazer", "Bomber Jacket", "Denim Jacket", "Windbreaker", "Sweater", "Cardigan", "Hoodie", "Coat", "Overcoat", "Other"]
-   - tops: ["T-Shirt", "Shirt", "Polo", "Kurta", "Overshirt", "Henley", "Tank Top", "Sweatshirt", "Hoodie", "Other"]
+   - accessories: ["Watch", "Belt", "Handbag", "Sling Bag", "Tote", "Earrings", "Necklace", "Bracelet", "Jewellery", "Sunglasses", "Scarf", "Dupatta", "Ring", "Cap", "Hat", "Tie", "Pocket Square", "Wallet", "Other"]
+   - footwear: ["Sneakers", "Heels", "Flats", "Loafers", "Formal Shoes", "Sandals", "Boots", "Juttis", "Mojaris", "Wedges", "Slides", "Running Shoes", "Kolhapuris", "Slippers", "Other"]
+   - bottoms: ["Jeans", "Trousers", "Wide-Leg Pants", "Palazzo", "Chinos", "Formal Pants", "Skirt", "Shorts", "Culottes", "Cargo Pants", "Salwar", "Churidar", "Leggings", "Sharara", "Track Pants", "Joggers", "Dhoti", "Pajama", "Other"]
+   - layers: ["Blazer", "Jacket", "Cardigan", "Shrug", "Bomber Jacket", "Denim Jacket", "Sweater", "Coat", "Overshirt", "Nehru Jacket", "Windbreaker", "Hoodie", "Other"]
+   - tops: ["T-Shirt", "Shirt", "Blouse", "Crop Top", "Kurti", "Kurta", "Tunic", "Polo", "Overshirt", "Sweater", "Peplum Top", "Tank Top", "Camisole", "Henley", "Sweatshirt", "Hoodie", "Dress", "Saree", "Other"]
 4. "primary_color": Strictly choose from: ${JSON.stringify(PRIMARY_COLOR_OPTIONS)}. (Accurately distinguish Black vs Charcoal vs Navy Blue vs Olive Green vs Brown vs Burgundy vs White vs Off-White vs Beige).
 5. "material": Strictly choose from: ${JSON.stringify(FABRIC_OPTIONS)}.
    - For leather belts/shoes/bags: choose "Leather" or "Suede".
