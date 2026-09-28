@@ -3,13 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ShieldCheck, AlertCircle, Clock, Sparkles } from 'lucide-react';
+import { ShieldCheck, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isTimeout = searchParams.get('timeout') === 'true';
   const urlError = searchParams.get('error');
 
   const [error, setError] = useState(urlError ? decodeURIComponent(urlError) : '');
@@ -41,7 +40,7 @@ function LoginForm() {
       const supabase = createClient();
       const redirectUrl = `${window.location.origin}/auth/callback`;
 
-      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
@@ -84,13 +83,6 @@ function LoginForm() {
 
         {/* Card Box */}
         <div className="bg-white rounded-3xl border border-[#EBE5DB] shadow-xl p-6 sm:p-8 space-y-6">
-          {isTimeout && (
-            <div className="p-3.5 bg-[#F4EFEA] border border-[#E8DFD5] rounded-2xl text-xs text-[#5E4633] flex items-start space-x-2.5 animate-in fade-in duration-200">
-              <Clock className="w-4 h-4 text-[#7E6047] flex-shrink-0 mt-0.5" />
-              <span>Your session expired after 2 hours of inactivity. Please sign in again.</span>
-            </div>
-          )}
-
           {error && (
             <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 flex items-start space-x-2 animate-in fade-in duration-200">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
