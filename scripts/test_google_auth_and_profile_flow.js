@@ -91,6 +91,13 @@ async function runTests() {
       mobile_number: userA_mobile,
     }).eq('id', userA_id);
 
+    // Complete profile with Name, Mobile, and Age
+    const userA_age = 24;
+    await supabase.from('users').update({
+      name: 'Akshith',
+      mobile_number: userA_mobile,
+    }).eq('id', userA_id);
+
     // Complete profile
     const { data: pCompletedA, error: errPComp } = await supabase.from('profiles').update({
       height: "5'7\"",
@@ -107,7 +114,7 @@ async function runTests() {
     }).eq('user_id', userA_id).select('*');
     if (errPComp) throw new Error('Failed to complete profile: ' + errPComp.message);
 
-    console.log('✓ Profile successfully completed with Indian Mobile:', userA_mobile);
+    console.log('✓ Profile successfully completed with Name: Akshith, Mobile:', userA_mobile);
     console.log('✓ profile_completed =', pCompletedA[0].profile_completed);
 
     // -------------------------------------------------------------

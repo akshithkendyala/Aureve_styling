@@ -17,19 +17,22 @@ export async function GET() {
       email: session.email || '',
       name: session.name || 'Member',
       mobile_number: session.mobile || '',
+      age: undefined,
       avatar_url: session.avatarUrl || '',
       created_at: new Date().toISOString(),
     };
 
     const profile = await Repository.getUserProfile(resolvedUser.id);
+    const finalName = (profile?.name || resolvedUser.name || 'Member').trim();
 
     return NextResponse.json({
       authenticated: true,
       user: {
         id: resolvedUser.id,
         email: resolvedUser.email,
-        name: resolvedUser.name,
+        name: finalName,
         mobile_number: resolvedUser.mobile_number || profile?.mobile_number || '',
+        age: profile?.age ?? resolvedUser.age,
         avatar_url: resolvedUser.avatar_url,
       },
       profile,

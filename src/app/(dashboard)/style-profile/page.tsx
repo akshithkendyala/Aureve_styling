@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile } from '@/lib/types';
 import { POPULAR_INDIAN_CITIES } from '@/lib/weather/weatherService';
-import { Sparkles, Check, User, Palette, Sliders, Phone, Mail } from 'lucide-react';
+import { Sparkles, Check, User, Palette, Sliders, Phone, Mail, MapPin, Layers } from 'lucide-react';
 import { normalizeMobileNumber, isValidIndianMobile, formatMobileDisplay } from '@/lib/auth/mobile';
 
 const POPULAR_COLORS = [
@@ -47,17 +47,30 @@ const POPULAR_OCCASIONS = [
 
 export default function StyleProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
+  const [age, setAge] = useState('');
   const [height, setHeight] = useState("5'10\"");
   const [weight, setWeight] = useState('72 kg');
   const [skinTone, setSkinTone] = useState('Warm Olive');
   const [preferredFit, setPreferredFit] = useState<'Slim' | 'Regular' | 'Relaxed' | 'Oversized'>('Regular');
-  const [favoriteColors, setFavoriteColors] = useState<string[]>(['Navy Blue', 'White', 'Olive Green', 'Charcoal Grey']);
+  const [favoriteColors, setFavoriteColors] = useState<string[]>([
+    'Navy Blue',
+    'White',
+    'Olive Green',
+    'Charcoal Grey',
+  ]);
   const [avoidedColors, setAvoidedColors] = useState<string[]>(['Neon Green', 'Bright Orange']);
   const [stylePrefs, setStylePrefs] = useState<string[]>(['Smart Casual', 'Minimal', 'Modern Indian']);
-  const [comfortPreference, setComfortPreference] = useState<'Maximum Comfort' | 'Balanced' | 'Structure & Sharpness'>('Balanced');
-  const [typicalOccasions, setTypicalOccasions] = useState<string[]>(['Office', 'Casual outings', 'Dates']);
+  const [comfortPreference, setComfortPreference] = useState<
+    'Maximum Comfort' | 'Balanced' | 'Structure & Sharpness'
+  >('Balanced');
+  const [typicalOccasions, setTypicalOccasions] = useState<string[]>([
+    'Office',
+    'Casual outings',
+    'Dates',
+  ]);
   const [city, setCity] = useState('Mumbai');
 
   const [isLoading, setIsLoading] = useState(true);
@@ -74,7 +87,9 @@ export default function StyleProfilePage() {
           if (data.profile) {
             const p = data.profile;
             setProfile(p);
+            if (p.name) setName(p.name);
             if (p.email) setEmail(p.email);
+            if (p.age) setAge(String(p.age));
             if (p.mobile_number) {
               const rawDigits = p.mobile_number.replace(/\D/g, '');
               setMobileNumber(rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits);
@@ -140,8 +155,21 @@ export default function StyleProfilePage() {
     setSavedSuccess(false);
     setSaveError('');
 
+    if (!name.trim()) {
+      setSaveError('Please enter your preferred name.');
+      setIsSaving(false);
+      return;
+    }
+
     if (mobileNumber && !isValidIndianMobile(mobileNumber)) {
       setSaveError('Please enter a valid 10-digit Indian mobile number.');
+      setIsSaving(false);
+      return;
+    }
+
+    const parsedAge = age ? Number(age) : undefined;
+    if (parsedAge !== undefined && (isNaN(parsedAge) || parsedAge < 13 || parsedAge > 120)) {
+      setSaveError('Please enter a valid age between 13 and 120.');
       setIsSaving(false);
       return;
     }
@@ -151,7 +179,10 @@ export default function StyleProfilePage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          name: name.trim(),
+          full_name: name.trim(),
           mobile_number: mobileNumber ? normalizeMobileNumber(mobileNumber) : undefined,
+          age: parsedAge,
           height,
           weight,
           skin_tone: skinTone,
@@ -192,14 +223,14 @@ export default function StyleProfilePage() {
           My Style Profile
         </h1>
         <p className="text-xs sm:text-sm text-[#7E6047] mt-1">
-          AUREVÉ uses your proportions and preferences strictly for fit alignment and color harmony.
+          AUREVÉ uses your proportions and preferences strictly for personalized fit alignment and occasion recommendations.
         </p>
       </div>
 
       {savedSuccess && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 flex items-center space-x-2 animate-in fade-in duration-200">
           <Check className="w-4 h-4 text-emerald-600" />
-          <span>Style profile updated! Recommendations will align with your new preferences.</span>
+          <span>Style profile updated! Your preferred name and recommendations are synchronized.</span>
         </div>
       )}
 
@@ -211,16 +242,33 @@ export default function StyleProfilePage() {
       )}
 
       <form onSubmit={handleSaveProfile} className="space-y-8">
-        {/* 1. Account & Contact Verification */}
+        {/* 1. Account & Identity */}
         <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-4">
           <div className="flex items-center space-x-2 pb-3 border-b border-[#F4EFEA]">
             <User className="w-4 h-4 text-[#9A7B5F]" />
             <h3 className="font-serif text-xl font-semibold text-[#18181B]">
-              Account & Mobile Contact
+              Personal Information & Identity
             </h3>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B] mb-1.5">
+                Preferred Name <span className="text-rose-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                placeholder="e.g. Akshith"
+                className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
+              />
+              <p className="text-[10px] text-[#9A7B5F] mt-1">
+                Used in greetings across your dashboard and wardrobe.
+              </p>
+            </div>
+
             {email && (
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
@@ -235,11 +283,14 @@ export default function StyleProfilePage() {
                     className="w-full pl-10 pr-4 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#7E6047] cursor-default focus:outline-none"
                   />
                 </div>
+                <p className="text-[10px] text-[#9A7B5F] mt-1">
+                  Primary authentication identity.
+                </p>
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B] mb-1.5">
                 Registered Mobile Number <span className="text-rose-600">*</span>
               </label>
               <div className="relative flex items-center">
@@ -256,13 +307,28 @@ export default function StyleProfilePage() {
                 />
               </div>
             </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B] mb-1.5">
+                Age
+              </label>
+              <input
+                type="number"
+                min={13}
+                max={120}
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                placeholder="e.g. 25"
+                className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
+              />
+            </div>
           </div>
         </div>
 
         {/* 2. Proportions & Silhouette */}
         <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-5">
           <div className="flex items-center space-x-2 pb-3 border-b border-[#F4EFEA]">
-            <Sliders className="w-4 h-4 text-[#9A7B5F]" />
+            <Layers className="w-4 h-4 text-[#9A7B5F]" />
             <h3 className="font-serif text-xl font-semibold text-[#18181B]">
               Proportions & Silhouette
             </h3>
@@ -304,86 +370,80 @@ export default function StyleProfilePage() {
                 onChange={(e) => setSkinTone(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
               >
+                <option value="Fair">Fair</option>
                 <option value="Warm Olive">Warm Olive</option>
-                <option value="Deep Tan">Deep Tan</option>
                 <option value="Medium Wheatish">Medium Wheatish</option>
                 <option value="Dusky">Dusky</option>
-                <option value="Fair">Fair</option>
+                <option value="Deep Tan">Deep Tan</option>
               </select>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
-              Preferred Fit
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {['Slim', 'Regular', 'Relaxed', 'Oversized'].map((fit) => {
-                const isSelected = preferredFit === fit;
-                return (
-                  <button
-                    key={fit}
-                    type="button"
-                    onClick={() => setPreferredFit(fit as any)}
-                    className={`p-3 rounded-2xl border text-center transition-all ${
-                      isSelected
-                        ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
-                        : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
-                    }`}
-                  >
-                    <span className="text-xs font-semibold">{fit}</span>
-                  </button>
-                );
-              })}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
+                Preferred Fit
+              </label>
+              <select
+                value={preferredFit}
+                onChange={(e) => setPreferredFit(e.target.value as any)}
+                className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
+              >
+                <option value="Slim">Slim</option>
+                <option value="Regular">Regular</option>
+                <option value="Relaxed">Relaxed</option>
+                <option value="Oversized">Oversized</option>
+              </select>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
-              Home City
-            </label>
-            <select
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
-            >
-              {POPULAR_INDIAN_CITIES.map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name} ({c.state})
-                </option>
-              ))}
-            </select>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
+                Home City (Climate)
+              </label>
+              <select
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
+              >
+                {POPULAR_INDIAN_CITIES.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.name} ({c.state})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* 3. Color Preferences */}
+        {/* 3. Color Palette Preferences */}
         <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6">
           <div className="flex items-center space-x-2 pb-3 border-b border-[#F4EFEA]">
             <Palette className="w-4 h-4 text-[#9A7B5F]" />
             <h3 className="font-serif text-xl font-semibold text-[#18181B]">
-              Color Preferences
+              Color Harmonies & Palette
             </h3>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
-              Favorite Colors
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-3">
+              Favorite Colors (Click to toggle)
             </label>
             <div className="flex flex-wrap gap-2">
-              {POPULAR_COLORS.map((col) => {
-                const isSelected = favoriteColors.includes(col);
+              {POPULAR_COLORS.map((c) => {
+                const isSelected = favoriteColors.includes(c);
                 return (
                   <button
-                    key={col}
+                    key={c}
                     type="button"
-                    onClick={() => toggleFavColor(col)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    onClick={() => toggleFavColor(c)}
+                    className={`px-3.5 py-2 rounded-full text-xs font-medium transition-all ${
                       isSelected
-                        ? 'bg-[#18181B] text-white'
+                        ? 'bg-[#18181B] text-white shadow-xs'
                         : 'bg-[#FAF8F5] text-[#5E4633] border border-[#EBE5DB] hover:border-[#18181B]'
                     }`}
                   >
-                    {col}
+                    {isSelected && <Check className="w-3 h-3 inline mr-1" />}
+                    {c}
                   </button>
                 );
               })}
@@ -391,24 +451,24 @@ export default function StyleProfilePage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-3">
               Colors to Avoid
             </label>
             <div className="flex flex-wrap gap-2">
-              {POPULAR_COLORS.map((col) => {
-                const isAvoided = avoidedColors.includes(col);
+              {['Neon Green', 'Bright Orange', 'Hot Pink', 'Mustard Yellow', 'Purple'].map((c) => {
+                const isSelected = avoidedColors.includes(c);
                 return (
                   <button
-                    key={col}
+                    key={c}
                     type="button"
-                    onClick={() => toggleAvoidColor(col)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      isAvoided
-                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                    onClick={() => toggleAvoidColor(c)}
+                    className={`px-3.5 py-2 rounded-full text-xs font-medium transition-all ${
+                      isSelected
+                        ? 'bg-rose-100 text-rose-800 border border-rose-200'
                         : 'bg-[#FAF8F5] text-[#5E4633] border border-[#EBE5DB] hover:border-[#18181B]'
                     }`}
                   >
-                    {col}
+                    {c}
                   </button>
                 );
               })}
@@ -416,34 +476,34 @@ export default function StyleProfilePage() {
           </div>
         </div>
 
-        {/* 4. Style & Occasions */}
+        {/* 4. Style Aesthetic & Lifestyle */}
         <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6">
           <div className="flex items-center space-x-2 pb-3 border-b border-[#F4EFEA]">
-            <Sparkles className="w-4 h-4 text-[#9A7B5F]" />
+            <Sliders className="w-4 h-4 text-[#9A7B5F]" />
             <h3 className="font-serif text-xl font-semibold text-[#18181B]">
-              Style & Occasions
+              Style Aesthetic & Occasions
             </h3>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-3">
               Style Personas
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {STYLE_PREFERENCES.map((style) => {
-                const isSelected = stylePrefs.includes(style);
+              {STYLE_PREFERENCES.map((s) => {
+                const isSelected = stylePrefs.includes(s);
                 return (
                   <button
-                    key={style}
+                    key={s}
                     type="button"
-                    onClick={() => toggleStylePref(style)}
-                    className={`p-3 rounded-2xl border text-center transition-all ${
+                    onClick={() => toggleStylePref(s)}
+                    className={`p-3 rounded-2xl border text-center text-xs font-medium transition-all ${
                       isSelected
-                        ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
-                        : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
+                        ? 'border-[#18181B] bg-[#18181B] text-white'
+                        : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#5E4633] hover:border-[#18181B]'
                     }`}
                   >
-                    <span className="text-xs font-semibold">{style}</span>
+                    {s}
                   </button>
                 );
               })}
@@ -451,10 +511,10 @@ export default function StyleProfilePage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-3">
               Typical Occasions
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            <div className="flex flex-wrap gap-2">
               {POPULAR_OCCASIONS.map((occ) => {
                 const isSelected = typicalOccasions.includes(occ);
                 return (
@@ -462,13 +522,13 @@ export default function StyleProfilePage() {
                     key={occ}
                     type="button"
                     onClick={() => toggleOccasion(occ)}
-                    className={`p-3 rounded-2xl border text-center transition-all ${
+                    className={`px-3.5 py-2 rounded-full text-xs font-medium transition-all ${
                       isSelected
-                        ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
-                        : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
+                        ? 'bg-[#18181B] text-white'
+                        : 'bg-[#FAF8F5] text-[#5E4633] border border-[#EBE5DB] hover:border-[#18181B]'
                     }`}
                   >
-                    <span className="text-xs font-semibold">{occ}</span>
+                    {occ}
                   </button>
                 );
               })}
@@ -476,24 +536,31 @@ export default function StyleProfilePage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-2">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-3">
               Comfort Preference
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {['Maximum Comfort', 'Balanced', 'Structure & Sharpness'].map((c) => {
-                const isSelected = comfortPreference === c;
+              {[
+                { title: 'Maximum Comfort', desc: 'Breathable, relaxed fabrics' },
+                { title: 'Balanced', desc: 'Equal parts ease and polish' },
+                { title: 'Structure & Sharpness', desc: 'Tailored silhouettes' },
+              ].map((item) => {
+                const isSelected = comfortPreference === item.title;
                 return (
                   <button
-                    key={c}
+                    key={item.title}
                     type="button"
-                    onClick={() => setComfortPreference(c as any)}
-                    className={`p-3.5 rounded-2xl border text-left transition-all ${
+                    onClick={() => setComfortPreference(item.title as any)}
+                    className={`p-4 rounded-2xl border text-left transition-all ${
                       isSelected
-                        ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
-                        : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
+                        ? 'border-[#18181B] bg-[#18181B] text-white'
+                        : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#5E4633] hover:border-[#18181B]'
                     }`}
                   >
-                    <span className="text-xs font-semibold block">{c}</span>
+                    <div className="text-xs font-semibold mb-0.5">{item.title}</div>
+                    <div className={`text-[11px] ${isSelected ? 'text-[#FAF8F5]/80' : 'text-[#7E6047]'}`}>
+                      {item.desc}
+                    </div>
                   </button>
                 );
               })}
@@ -506,9 +573,16 @@ export default function StyleProfilePage() {
           <button
             type="submit"
             disabled={isSaving}
-            className="px-8 py-3.5 rounded-full bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] text-xs font-semibold tracking-wide uppercase transition-all shadow-md"
+            className="px-8 py-3.5 rounded-full bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] text-xs font-semibold tracking-wide uppercase transition-all shadow-md flex items-center space-x-2 disabled:opacity-50"
           >
-            {isSaving ? 'Saving Changes…' : 'Save Style Profile'}
+            {isSaving ? (
+              <span>Saving Preferences…</span>
+            ) : (
+              <>
+                <span>Save Style Profile</span>
+                <Sparkles className="w-4 h-4" />
+              </>
+            )}
           </button>
         </div>
       </form>

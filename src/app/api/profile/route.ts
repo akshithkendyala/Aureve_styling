@@ -41,18 +41,49 @@ export async function PUT(req: NextRequest) {
       updates.mobile_number = normalized;
     }
 
-    // If attempting to complete profile, enforce mobile number requirement
+    // Check age validation if supplied
+    if (updates.age !== undefined && updates.age !== null && updates.age !== '') {
+      const parsedAge = Number(updates.age);
+      if (isNaN(parsedAge) || parsedAge < 13 || parsedAge > 120) {
+        return NextResponse.json(
+          { error: 'Please enter a valid age between 13 and 120.' },
+          { status: 400 }
+        );
+      }
+      updates.age = parsedAge;
+    }
+
+    // If attempting to complete profile, enforce required fields (Name, Mobile, Age)
     if (updates.profile_completed === true) {
       const existingProfile = await Repository.getUserProfile(session.userId);
-      const targetMobile = updates.mobile_number || existingProfile?.mobile_number;
 
+      const targetName = (updates.name || updates.full_name || existingProfile?.name || '').trim();
+      if (!targetName) {
+        return NextResponse.json(
+          { error: 'Please enter your name to complete your AUREVÉ profile.' },
+          { status: 400 }
+        );
+      }
+      updates.name = targetName;
+      updates.full_name = targetName;
+
+      const targetMobile = updates.mobile_number || existingProfile?.mobile_number;
       if (!targetMobile || !isValidIndianMobile(targetMobile)) {
         return NextResponse.json(
-          { error: 'A valid Indian mobile number is required to complete your AUREVÉ profile.' },
+          { error: 'A valid 10-digit Indian mobile number is required to complete your profile.' },
           { status: 400 }
         );
       }
       updates.mobile_number = normalizeMobileNumber(targetMobile);
+
+      const targetAge = updates.age !== undefined ? Number(updates.age) : existingProfile?.age;
+      if (!targetAge || isNaN(targetAge) || targetAge < 13 || targetAge > 120) {
+        return NextResponse.json(
+          { error: 'Please enter a valid age (13-120) to complete your profile.' },
+          { status: 400 }
+        );
+      }
+      updates.age = targetAge;
     }
 
     const updatedProfile = await Repository.upsertUserProfile(session.userId, updates);

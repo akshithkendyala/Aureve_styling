@@ -59,7 +59,6 @@ export const Repository = {
     if (!id) return null;
 
     if (isSupabaseConfigured && supabaseAdmin) {
-      // 1. Check users table in Supabase
       try {
         const { data: dbUser, error: dbErr } = await supabaseAdmin
           .from('users')
@@ -67,10 +66,10 @@ export const Repository = {
           .eq('id', id)
           .maybeSingle();
 
-        // 2. Also check Supabase Auth admin user for email & metadata
         let authEmail = '';
         let authName = '';
         let authMobile = '';
+        let authAge: number | undefined = undefined;
         let authAvatar = '';
 
         try {
@@ -78,11 +77,14 @@ export const Repository = {
           if (!authErr && authData?.user) {
             authEmail = authData.user.email || '';
             authName =
-              authData.user.user_metadata?.full_name ||
               authData.user.user_metadata?.name ||
+              authData.user.user_metadata?.full_name ||
               authEmail.split('@')[0] ||
               'Member';
             authMobile = authData.user.user_metadata?.mobile_number || '';
+            if (authData.user.user_metadata?.age) {
+              authAge = Number(authData.user.user_metadata.age);
+            }
             authAvatar =
               authData.user.user_metadata?.avatar_url ||
               authData.user.user_metadata?.picture ||
@@ -98,6 +100,7 @@ export const Repository = {
             email: authEmail,
             name: dbUser.name || authName || 'Member',
             mobile_number: dbUser.mobile_number || authMobile || '',
+            age: authAge,
             avatar_url: authAvatar,
             created_at: dbUser.created_at,
             updated_at: dbUser.updated_at,
@@ -111,6 +114,7 @@ export const Repository = {
             email: authEmail,
             name: authName || 'Member',
             mobile_number: authMobile || '',
+            age: authAge,
             avatar_url: authAvatar,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -152,6 +156,7 @@ export const Repository = {
       full_name?: string;
       name?: string;
       mobile_number?: string;
+      age?: number;
       avatar_url?: string;
       picture?: string;
     };
@@ -159,11 +164,12 @@ export const Repository = {
   }): Promise<User> {
     const userId = authUser.id;
     const name =
-      authUser.user_metadata?.full_name ||
       authUser.user_metadata?.name ||
+      authUser.user_metadata?.full_name ||
       authUser.email?.split('@')[0] ||
       'Member';
     const mobileNumber = authUser.user_metadata?.mobile_number || '';
+    const age = authUser.user_metadata?.age ? Number(authUser.user_metadata.age) : undefined;
     const avatarUrl =
       authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || '';
 
@@ -172,6 +178,7 @@ export const Repository = {
       email: authUser.email,
       name,
       mobile_number: mobileNumber,
+      age,
       avatar_url: avatarUrl,
       created_at: authUser.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -264,8 +271,10 @@ export const Repository = {
         id: profileData.id,
         user_id: userId,
         email: userRecord?.email || '',
-        full_name: userRecord?.name || '',
+        name: userRecord?.name || 'Member',
+        full_name: userRecord?.name || 'Member',
         mobile_number: userRecord?.mobile_number || '',
+        age: userRecord?.age,
         height: profileData.height || "5'10\"",
         weight: profileData.weight || '72 kg',
         skin_tone: profileData.skin_tone || 'Warm Olive',
@@ -297,8 +306,10 @@ export const Repository = {
       return {
         ...cached,
         email: userRecord?.email || cached.email || '',
-        full_name: userRecord?.name || cached.full_name || '',
+        name: userRecord?.name || cached.name || 'Member',
+        full_name: userRecord?.name || cached.full_name || 'Member',
         mobile_number: userRecord?.mobile_number || cached.mobile_number || '',
+        age: userRecord?.age || cached.age,
       };
     }
 
@@ -307,8 +318,10 @@ export const Repository = {
       id: generateId(),
       user_id: userId,
       email: userRecord?.email || '',
+      name: userRecord?.name || 'Member',
       full_name: userRecord?.name || 'Member',
       mobile_number: userRecord?.mobile_number || '',
+      age: userRecord?.age,
       city: 'Mumbai',
       height: "5'10\"",
       weight: '72 kg',
@@ -333,14 +346,17 @@ export const Repository = {
       ? normalizeMobileNumber(profileData.mobile_number) || profileData.mobile_number
       : existing?.mobile_number || '';
 
-    const fullName = profileData.full_name || existing?.full_name || 'Member';
+    const preferredName = (profileData.name || profileData.full_name || existing?.name || existing?.full_name || 'Member').trim();
+    const userAge = profileData.age !== undefined ? Number(profileData.age) : existing?.age;
 
     const updated: UserProfile = {
       id: existing?.id || generateId(),
       user_id: userId,
       email: existing?.email || profileData.email || '',
-      full_name: fullName,
+      name: preferredName,
+      full_name: preferredName,
       mobile_number: cleanMobile,
+      age: userAge,
       height: profileData.height ?? existing?.height ?? "5'10\"",
       weight: profileData.weight ?? existing?.weight ?? '72 kg',
       skin_tone: profileData.skin_tone ?? existing?.skin_tone ?? 'Warm Olive',
@@ -366,7 +382,33 @@ export const Repository = {
     };
 
     if (isSupabaseConfigured && supabaseAdmin) {
-      // 1. Update public.profiles
+      // 1. Sync public.users first (due to foreign key constraint)
+      try {
+        await supabaseAdmin.from('users').upsert(
+          {
+            id: userId,
+            name: preferredName,
+            mobile_number: cleanMobile || '',
+            pin_hash: '',
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
+
+        // Update auth user metadata
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
+          user_metadata: {
+            name: preferredName,
+            full_name: preferredName,
+            mobile_number: cleanMobile,
+            age: userAge,
+          },
+        });
+      } catch (userSyncErr) {
+        console.warn('User metadata sync note:', userSyncErr);
+      }
+
+      // 2. Update public.profiles
       try {
         const { data, error } = await supabaseAdmin
           .from('profiles')
@@ -397,42 +439,18 @@ export const Repository = {
       } catch (err) {
         console.warn('Supabase upsertUserProfile note:', err);
       }
-
-      // 2. Sync mobile number and full name into public.users and Supabase Auth metadata
-      try {
-        await supabaseAdmin.from('users').upsert(
-          {
-            id: userId,
-            name: fullName,
-            mobile_number: cleanMobile || '',
-            pin_hash: '',
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'id' }
-        );
-
-        // Update auth user metadata
-        await supabaseAdmin.auth.admin.updateUserById(userId, {
-          user_metadata: {
-            full_name: fullName,
-            name: fullName,
-            mobile_number: cleanMobile,
-          },
-        });
-      } catch (userSyncErr) {
-        console.warn('User metadata sync note:', userSyncErr);
-      }
     }
 
     dbStore.profiles.set(userId, updated);
-    const existingUser = dbStore.users.get(userId);
-    if (existingUser) {
-      dbStore.users.set(userId, {
-        ...existingUser,
-        name: fullName,
-        mobile_number: cleanMobile,
-      });
-    }
+    dbStore.users.set(userId, {
+      id: userId,
+      email: updated.email,
+      name: preferredName,
+      mobile_number: cleanMobile,
+      age: userAge,
+      created_at: updated.created_at,
+      updated_at: updated.updated_at,
+    });
 
     return updated;
   },

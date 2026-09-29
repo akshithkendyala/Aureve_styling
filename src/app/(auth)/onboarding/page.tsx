@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Check,
   Phone,
+  Layers,
 } from 'lucide-react';
 import { POPULAR_INDIAN_CITIES } from '@/lib/weather/weatherService';
 import { isValidIndianMobile, normalizeMobileNumber } from '@/lib/auth/mobile';
@@ -90,25 +91,39 @@ export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
 
-  // Step 1: Mobile & Physical Profile & Location
+  // Step 1: Personal Information (Name, Mobile, Age, City)
+  const [name, setName] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
+  const [age, setAge] = useState('');
+  const [city, setCity] = useState('Mumbai');
+
+  // Step 2: Proportions & Fit
   const [height, setHeight] = useState("5'10\"");
   const [weight, setWeight] = useState('72 kg');
   const [skinTone, setSkinTone] = useState('Warm Olive');
   const [preferredFit, setPreferredFit] = useState<'Slim' | 'Regular' | 'Relaxed' | 'Oversized'>('Regular');
-  const [city, setCity] = useState('Mumbai');
 
-  // Step 2: Style & Colors
-  const [favoriteColors, setFavoriteColors] = useState<string[]>(['Navy Blue', 'White', 'Olive Green', 'Charcoal Grey']);
+  // Step 3: Style & Colors
+  const [favoriteColors, setFavoriteColors] = useState<string[]>([
+    'Navy Blue',
+    'White',
+    'Olive Green',
+    'Charcoal Grey',
+  ]);
   const [avoidedColors, setAvoidedColors] = useState<string[]>(['Neon Green', 'Bright Orange']);
   const [stylePrefs, setStylePrefs] = useState<string[]>(['Smart Casual', 'Minimal', 'Modern Indian']);
 
-  // Step 3: Comfort & Lifestyle
-  const [comfortPreference, setComfortPreference] = useState<'Maximum Comfort' | 'Balanced' | 'Structure & Sharpness'>('Balanced');
-  const [typicalOccasions, setTypicalOccasions] = useState<string[]>(['Office', 'Casual outings', 'Dates']);
+  // Step 4: Comfort & Lifestyle
+  const [comfortPreference, setComfortPreference] = useState<
+    'Maximum Comfort' | 'Balanced' | 'Structure & Sharpness'
+  >('Balanced');
+  const [typicalOccasions, setTypicalOccasions] = useState<string[]>([
+    'Office',
+    'Casual outings',
+    'Dates',
+  ]);
 
   // Errors
   const [stepError, setStepError] = useState('');
@@ -124,13 +139,25 @@ export default function OnboardingPage() {
 
         const data = await res.json();
         if (data.authenticated && data.user) {
-          setUserName(data.user.name || '');
           setUserEmail(data.user.email || '');
 
           // If user already completed onboarding, redirect straight to dashboard
           if (data.profile?.profile_completed === true) {
             router.push('/dashboard');
             return;
+          }
+
+          // Pre-fill Name from Google / profile
+          if (data.user.name) {
+            setName(data.user.name);
+          } else if (data.profile?.name) {
+            setName(data.profile.name);
+          }
+
+          if (data.user.age) {
+            setAge(String(data.user.age));
+          } else if (data.profile?.age) {
+            setAge(String(data.profile.age));
           }
 
           if (data.user.mobile_number) {
@@ -141,6 +168,8 @@ export default function OnboardingPage() {
           // Populate existing fields if any
           if (data.profile) {
             const p = data.profile;
+            if (p.name && !name) setName(p.name);
+            if (p.age && !age) setAge(String(p.age));
             if (p.mobile_number) {
               const rawDigits = p.mobile_number.replace(/\D/g, '');
               setMobileNumber(rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits);
@@ -163,12 +192,14 @@ export default function OnboardingPage() {
             if (savedDraft) {
               const draft = JSON.parse(savedDraft);
               if (draft.step) setCurrentStep(draft.step);
+              if (draft.name) setName(draft.name);
               if (draft.mobileNumber) setMobileNumber(draft.mobileNumber);
+              if (draft.age) setAge(String(draft.age));
+              if (draft.city) setCity(draft.city);
               if (draft.height) setHeight(draft.height);
               if (draft.weight) setWeight(draft.weight);
               if (draft.skinTone) setSkinTone(draft.skinTone);
               if (draft.preferredFit) setPreferredFit(draft.preferredFit);
-              if (draft.city) setCity(draft.city);
               if (draft.favoriteColors) setFavoriteColors(draft.favoriteColors);
               if (draft.avoidedColors) setAvoidedColors(draft.avoidedColors);
               if (draft.stylePrefs) setStylePrefs(draft.stylePrefs);
@@ -192,19 +223,21 @@ export default function OnboardingPage() {
     loadAuthAndDraft();
   }, [router]);
 
-  // Save draft on change
+  // Save draft on step change
   const saveDraft = (stepNumber: number) => {
     try {
       localStorage.setItem(
         'aureve_onboarding_draft',
         JSON.stringify({
           step: stepNumber,
+          name,
           mobileNumber,
+          age,
+          city,
           height,
           weight,
           skinTone,
           preferredFit,
-          city,
           favoriteColors,
           avoidedColors,
           stylePrefs,
@@ -221,10 +254,22 @@ export default function OnboardingPage() {
     setStepError('');
 
     if (currentStep === 1) {
-      if (!mobileNumber || !isValidIndianMobile(mobileNumber)) {
-        setStepError('Mobile number is required. Please enter a valid 10-digit Indian mobile number.');
+      if (!name.trim()) {
+        setStepError('Please enter your name to personalize your AUREVÉ profile.');
         return;
       }
+      if (!mobileNumber || !isValidIndianMobile(mobileNumber)) {
+        setStepError('Please enter a valid 10-digit Indian mobile number.');
+        return;
+      }
+      const parsedAge = Number(age);
+      if (!age || isNaN(parsedAge) || parsedAge < 13 || parsedAge > 120) {
+        setStepError('Please enter a valid age between 13 and 120.');
+        return;
+      }
+    }
+
+    if (currentStep === 2) {
       if (!height.trim()) {
         setStepError('Please provide your approximate height.');
         return;
@@ -235,20 +280,13 @@ export default function OnboardingPage() {
       }
     }
 
-    if (currentStep === 2) {
+    if (currentStep === 3) {
       if (favoriteColors.length === 0) {
         setStepError('Please select at least 1 favorite color.');
         return;
       }
       if (stylePrefs.length === 0) {
-        setStepError('Please select at least 1 style persona.');
-        return;
-      }
-    }
-
-    if (currentStep === 3) {
-      if (typicalOccasions.length === 0) {
-        setStepError('Please select at least 1 typical occasion for your lifestyle.');
+        setStepError('Please select at least 1 style aesthetic.');
         return;
       }
     }
@@ -305,8 +343,24 @@ export default function OnboardingPage() {
     setIsSaving(true);
     setStepError('');
 
+    if (!name.trim()) {
+      setStepError('Please enter your name.');
+      setCurrentStep(1);
+      setIsSaving(false);
+      return;
+    }
+
     if (!mobileNumber || !isValidIndianMobile(mobileNumber)) {
-      setStepError('Mobile number is required. Please return to Step 1 and provide a valid 10-digit Indian mobile number.');
+      setStepError('Mobile number is required. Please provide a valid 10-digit Indian mobile number.');
+      setCurrentStep(1);
+      setIsSaving(false);
+      return;
+    }
+
+    const parsedAge = Number(age);
+    if (!age || isNaN(parsedAge) || parsedAge < 13 || parsedAge > 120) {
+      setStepError('Please provide a valid age (13-120).');
+      setCurrentStep(1);
       setIsSaving(false);
       return;
     }
@@ -316,7 +370,11 @@ export default function OnboardingPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          name: name.trim(),
+          full_name: name.trim(),
           mobile_number: normalizeMobileNumber(mobileNumber),
+          age: parsedAge,
+          city,
           height: height.trim(),
           weight: weight.trim(),
           skin_tone: skinTone,
@@ -326,7 +384,6 @@ export default function OnboardingPage() {
           style_preferences: stylePrefs,
           comfort_preference: comfortPreference,
           typical_occasions: typicalOccasions,
-          city,
           profile_completed: true,
         }),
       });
@@ -366,10 +423,10 @@ export default function OnboardingPage() {
   }
 
   const steps = [
-    { num: 1, title: 'About You', desc: 'Contact & Proportions' },
-    { num: 2, title: 'Your Style', desc: 'Palette & Aesthetics' },
-    { num: 3, title: 'Lifestyle', desc: 'Occasions & Comfort' },
-    { num: 4, title: 'Finish', desc: 'Start Styling' },
+    { num: 1, title: 'Personal Info', desc: 'Name, Mobile & Age' },
+    { num: 2, title: 'Proportions', desc: 'Fit & Silhouette' },
+    { num: 3, title: 'Your Palette', desc: 'Colors & Aesthetics' },
+    { num: 4, title: 'Lifestyle & Finish', desc: 'Occasions & Review' },
   ];
 
   return (
@@ -386,13 +443,11 @@ export default function OnboardingPage() {
             </h1>
           </Link>
           <p className="text-xs uppercase font-bold tracking-widest text-[#7E6047]">
-            Complete Your Style Profile
+            Complete Your First-Time Profile
           </p>
-          {userName && (
-            <p className="text-xs text-[#5E4633] pt-0.5">
-              Welcome, <strong className="font-semibold text-[#18181B]">{userName}</strong> ({userEmail}). Let&apos;s calibrate your private styling preferences.
-            </p>
-          )}
+          <p className="text-xs text-[#5E4633] pt-0.5">
+            Signed in with <strong className="font-semibold text-[#18181B]">{userEmail}</strong>. Let&apos;s calibrate your personalized styling preferences.
+          </p>
         </div>
 
         {/* Progress Stepper Bar */}
@@ -438,7 +493,7 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* STEP 1: ABOUT YOU (Mobile, Proportions & Location) */}
+        {/* STEP 1: PERSONAL INFORMATION (Name, Mobile Number, Age, City) */}
         {currentStep === 1 && (
           <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6 shadow-md animate-in fade-in duration-300">
             <div className="border-b border-[#F4EFEA] pb-4 space-y-1">
@@ -447,39 +502,133 @@ export default function OnboardingPage() {
                 <span className="text-xs uppercase font-bold tracking-wider">Step 1 of 4</span>
               </div>
               <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[#18181B]">
-                Your Contact & Proportions
+                Personal Information
               </h2>
               <p className="text-xs text-[#7E6047]">
-                AUREVÉ links your mobile number to your profile and calculates fabric drape, layer balance, and regional climate context.
+                Tell us how you would like AUREVÉ to address you, your contact number, and your location.
               </p>
             </div>
 
-            {/* Mobile Number — REQUIRED */}
+            {/* Preferred Name — REQUIRED */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B]">
-                  Mobile Number <span className="text-rose-600 font-bold">*</span>
+                  Your Name <span className="text-rose-600 font-bold">*</span>
                 </label>
                 <span className="text-[10px] font-medium text-[#7E6047]">
-                  Required for AUREVÉ profile
+                  Used across your AUREVÉ dashboard
                 </span>
               </div>
-              <div className="relative flex items-center">
-                <span className="absolute left-3.5 text-xs font-semibold text-[#7E6047] border-r border-[#D6C7B7] pr-2">
-                  +91
-                </span>
+              <div className="relative">
                 <input
-                  type="tel"
-                  maxLength={10}
-                  value={mobileNumber}
-                  onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   required
-                  placeholder="98765 43210"
-                  className="w-full pl-16 pr-4 py-3 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] placeholder-[#9A7B5F]/60 focus:outline-none focus:border-[#18181B] transition-colors"
+                  placeholder="e.g. Akshith"
+                  className="w-full px-4 py-3 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] placeholder-[#9A7B5F]/60 focus:outline-none focus:border-[#18181B] transition-colors"
                 />
               </div>
               <p className="text-[10px] text-[#9A7B5F] mt-1">
-                Enter your 10-digit Indian mobile number. Used solely for your private profile and outfit alerts.
+                Pre-filled from your Google account. You can edit this to your preferred first name or nickname.
+              </p>
+            </div>
+
+            {/* Mobile Number & Age Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Mobile Number — REQUIRED */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B]">
+                    Mobile Number <span className="text-rose-600 font-bold">*</span>
+                  </label>
+                  <span className="text-[10px] font-medium text-[#7E6047]">
+                    10 digits
+                  </span>
+                </div>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 text-xs font-semibold text-[#7E6047] border-r border-[#D6C7B7] pr-2">
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    maxLength={10}
+                    value={mobileNumber}
+                    onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                    required
+                    placeholder="98765 43210"
+                    className="w-full pl-16 pr-4 py-3 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] placeholder-[#9A7B5F]/60 focus:outline-none focus:border-[#18181B] transition-colors"
+                  />
+                </div>
+                <p className="text-[10px] text-[#9A7B5F] mt-1">
+                  Required for your private AUREVÉ profile.
+                </p>
+              </div>
+
+              {/* Age — REQUIRED */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B]">
+                    Age <span className="text-rose-600 font-bold">*</span>
+                  </label>
+                  <span className="text-[10px] font-medium text-[#7E6047]">
+                    Years (13-120)
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={13}
+                    max={120}
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    required
+                    placeholder="e.g. 25"
+                    className="w-full px-4 py-3 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] placeholder-[#9A7B5F]/60 focus:outline-none focus:border-[#18181B] transition-colors"
+                  />
+                </div>
+                <p className="text-[10px] text-[#9A7B5F] mt-1">
+                  Helps tailor age-appropriate and occasion-accurate styling suggestions.
+                </p>
+              </div>
+            </div>
+
+            {/* Location / City */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
+                Home City (Climate & Regional Weather Context)
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9A7B5F]" />
+                <select
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
+                >
+                  {POPULAR_INDIAN_CITIES.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name} ({c.state})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2: PROPORTIONS & FIT */}
+        {currentStep === 2 && (
+          <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6 shadow-md animate-in fade-in duration-300">
+            <div className="border-b border-[#F4EFEA] pb-4 space-y-1">
+              <div className="flex items-center space-x-2 text-[#7E6047]">
+                <Layers className="w-4 h-4 text-[#9A7B5F]" />
+                <span className="text-xs uppercase font-bold tracking-wider">Step 2 of 4</span>
+              </div>
+              <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[#18181B]">
+                Proportions & Silhouette
+              </h2>
+              <p className="text-xs text-[#7E6047]">
+                Helps AUREVÉ calibrate layer balances, pant breaks, and garment drape.
               </p>
             </div>
 
@@ -597,37 +746,16 @@ export default function OnboardingPage() {
                 })}
               </div>
             </div>
-
-            {/* Location / City */}
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
-                Home City (Default Climate & Weather Context)
-              </label>
-              <div className="relative">
-                <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9A7B5F]" />
-                <select
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
-                >
-                  {POPULAR_INDIAN_CITIES.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name} ({c.state})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
           </div>
         )}
 
-        {/* STEP 2: PALETTE & STYLE PERSONAS */}
-        {currentStep === 2 && (
+        {/* STEP 3: PALETTE & STYLE PERSONAS */}
+        {currentStep === 3 && (
           <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6 shadow-md animate-in fade-in duration-300">
             <div className="border-b border-[#F4EFEA] pb-4 space-y-1">
               <div className="flex items-center space-x-2 text-[#7E6047]">
                 <Palette className="w-4 h-4 text-[#9A7B5F]" />
-                <span className="text-xs uppercase font-bold tracking-wider">Step 2 of 4</span>
+                <span className="text-xs uppercase font-bold tracking-wider">Step 3 of 4</span>
               </div>
               <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[#18181B]">
                 Your Color Palette & Aesthetics
@@ -730,16 +858,16 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* STEP 3: LIFESTYLE & OCCASIONS */}
-        {currentStep === 3 && (
+        {/* STEP 4: LIFESTYLE, OCCASIONS & REVIEW */}
+        {currentStep === 4 && (
           <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6 shadow-md animate-in fade-in duration-300">
             <div className="border-b border-[#F4EFEA] pb-4 space-y-1">
               <div className="flex items-center space-x-2 text-[#7E6047]">
                 <Sliders className="w-4 h-4 text-[#9A7B5F]" />
-                <span className="text-xs uppercase font-bold tracking-wider">Step 3 of 4</span>
+                <span className="text-xs uppercase font-bold tracking-wider">Step 4 of 4</span>
               </div>
               <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[#18181B]">
-                Your Lifestyle & Comfort
+                Lifestyle & Final Review
               </h2>
               <p className="text-xs text-[#7E6047]">
                 AUREVÉ balances ease and elevation based on where you spend your days.
@@ -818,53 +946,46 @@ export default function OnboardingPage() {
                 })}
               </div>
             </div>
-          </div>
-        )}
-
-        {/* STEP 4: REVIEW & FINISH */}
-        {currentStep === 4 && (
-          <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6 shadow-md animate-in fade-in duration-300">
-            <div className="text-center space-y-2">
-              <div className="w-12 h-12 bg-[#FAF8F5] border border-[#EBE5DB] rounded-full flex items-center justify-center mx-auto text-[#7E6047]">
-                <Sparkles className="w-6 h-6" />
-              </div>
-              <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[#18181B]">
-                Your Style Profile is Ready
-              </h2>
-              <p className="text-xs text-[#7E6047] max-w-md mx-auto">
-                AUREVÉ has mapped your proportions, aesthetics, and lifestyle to deliver outfit intelligence.
-              </p>
-            </div>
 
             {/* Profile Summary Card */}
-            <div className="p-5 rounded-2xl bg-[#FAF8F5] border border-[#EBE5DB] space-y-3.5 text-xs text-[#5E4633]">
-              <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-2">
-                <span className="font-semibold text-[#18181B]">Google Account</span>
-                <span className="font-mono text-[#7E6047]">{userEmail || 'Google Verified'}</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-2">
-                <span className="font-semibold text-[#18181B]">Registered Mobile</span>
-                <span className="font-mono text-[#7E6047]">+91 {mobileNumber}</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-2">
-                <span className="font-semibold text-[#18181B]">Proportions & Fit</span>
-                <span>{height} • {weight} • {preferredFit} Fit</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-2">
-                <span className="font-semibold text-[#18181B]">Skin Undertone</span>
-                <span>{skinTone}</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-2">
-                <span className="font-semibold text-[#18181B]">Favorite Colors</span>
-                <span>{favoriteColors.join(', ')}</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-2">
-                <span className="font-semibold text-[#18181B]">Style Direction</span>
-                <span>{stylePrefs.join(', ')}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-semibold text-[#18181B]">Home City</span>
-                <span>{city}</span>
+            <div className="p-5 rounded-2xl bg-[#FAF8F5] border border-[#EBE5DB] space-y-3 text-xs text-[#5E4633]">
+              <h3 className="font-serif text-sm font-semibold text-[#18181B] flex items-center space-x-1.5">
+                <Sparkles className="w-4 h-4 text-[#7E6047]" />
+                <span>Profile Confirmation Summary</span>
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-1.5">
+                  <span className="font-semibold text-[#18181B]">Display Name:</span>
+                  <span className="text-[#7E6047] font-medium">{name}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-1.5">
+                  <span className="font-semibold text-[#18181B]">Google Email:</span>
+                  <span className="font-mono text-[#7E6047] truncate max-w-[150px]">{userEmail}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-1.5">
+                  <span className="font-semibold text-[#18181B]">Mobile Number:</span>
+                  <span className="font-mono text-[#7E6047]">+91 {mobileNumber}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-1.5">
+                  <span className="font-semibold text-[#18181B]">Age:</span>
+                  <span className="text-[#7E6047] font-medium">{age} years</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-1.5">
+                  <span className="font-semibold text-[#18181B]">Proportions:</span>
+                  <span>{height} • {weight}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-1.5">
+                  <span className="font-semibold text-[#18181B]">Fit & Undertone:</span>
+                  <span>{preferredFit} • {skinTone}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-1.5">
+                  <span className="font-semibold text-[#18181B]">Home City:</span>
+                  <span>{city}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-[#EBE5DB] pb-1.5">
+                  <span className="font-semibold text-[#18181B]">Style Direction:</span>
+                  <span className="truncate max-w-[150px]">{stylePrefs.join(', ')}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -899,13 +1020,13 @@ export default function OnboardingPage() {
               type="button"
               onClick={handleCompleteOnboarding}
               disabled={isSaving}
-              className="px-8 py-3.5 rounded-full bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] text-xs font-semibold tracking-wide uppercase transition-all shadow-md flex items-center space-x-2"
+              className="px-8 py-3.5 rounded-full bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] text-xs font-semibold tracking-wide uppercase transition-all shadow-md flex items-center space-x-2 disabled:opacity-50"
             >
               {isSaving ? (
                 <span>Saving Profile…</span>
               ) : (
                 <>
-                  <span>Enter My Wardrobe</span>
+                  <span>Complete Profile & Enter Dashboard</span>
                   <Sparkles className="w-4 h-4" />
                 </>
               )}
@@ -916,7 +1037,7 @@ export default function OnboardingPage() {
         {/* Security / Privacy Assurance */}
         <div className="text-center flex items-center justify-center space-x-1.5 text-[11px] text-[#9A7B5F]">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Your styling preferences are securely encrypted and private.</span>
+          <span>Your styling preferences are securely encrypted and private to your account.</span>
         </div>
       </div>
     </div>

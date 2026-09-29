@@ -112,8 +112,9 @@ export type ItemRole = 'top' | 'bottom' | 'footwear' | 'layer' | 'accessory';
 export interface User {
   id: string; // Supabase auth.users.id
   email?: string;
-  name: string;
+  name: string; // Preferred app name
   mobile_number?: string;
+  age?: number;
   avatar_url?: string;
   created_at: string;
   updated_at?: string;
@@ -123,8 +124,10 @@ export interface UserProfile {
   id: string;
   user_id: string; // Supabase auth.users.id
   email?: string;
+  name?: string; // Preferred app name (e.g. "Akshith")
   full_name?: string;
   mobile_number?: string; // Required Indian mobile number (+91XXXXXXXXXX)
+  age?: number; // Required user age
   height?: string; // e.g., "5'10\"" or "178 cm"
   weight?: string; // e.g., "72 kg"
   skin_tone?: string; // e.g., "Warm Olive", "Dusky", "Fair", "Deep Tan"

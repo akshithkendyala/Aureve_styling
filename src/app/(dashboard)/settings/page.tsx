@@ -12,6 +12,7 @@ import {
   Mail,
   Smartphone,
   Database,
+  Calendar,
 } from 'lucide-react';
 import { formatMobileDisplay } from '@/lib/auth/mobile';
 
@@ -113,13 +114,13 @@ export default function SettingsPage() {
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#EBE5DB]">
             <div className="flex items-center space-x-1.5 text-[10px] uppercase font-bold text-[#7E6047] mb-1">
               <User className="w-3 h-3" />
               <span>Full Name</span>
             </div>
-            <p className="font-serif text-base font-semibold text-[#18181B]">
+            <p className="font-serif text-base font-semibold text-[#18181B] truncate" title={user?.name}>
               {user?.name || 'Member'}
             </p>
           </div>
@@ -141,6 +142,16 @@ export default function SettingsPage() {
             </div>
             <p className="font-mono text-xs font-semibold text-[#18181B]">
               {formatMobileDisplay(user?.mobile_number) || '+91 ••••• •••••'}
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#EBE5DB]">
+            <div className="flex items-center space-x-1.5 text-[10px] uppercase font-bold text-[#7E6047] mb-1">
+              <Calendar className="w-3 h-3" />
+              <span>Age</span>
+            </div>
+            <p className="font-serif text-base font-semibold text-[#18181B]">
+              {user?.age ? `${user.age} yrs` : 'Not set'}
             </p>
           </div>
         </div>
