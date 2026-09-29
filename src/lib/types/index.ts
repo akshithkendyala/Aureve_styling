@@ -129,7 +129,8 @@ export interface UserProfile {
   mobile_number?: string; // Required Indian mobile number (+91XXXXXXXXXX)
   age?: number; // Required user age
   height?: string; // e.g., "5'10\"" or "178 cm"
-  weight?: string; // e.g., "72 kg"
+  weight?: string; // e.g., "72 kg" or "158 lb"
+  body_build?: 'Slim' | 'Athletic' | 'Medium' | 'Broad' | string;
   skin_tone?: string; // e.g., "Warm Olive", "Dusky", "Fair", "Deep Tan"
   preferred_fit?: 'Slim' | 'Regular' | 'Relaxed' | 'Oversized';
   favorite_colors: string[];

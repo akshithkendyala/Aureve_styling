@@ -51,27 +51,16 @@ export default function StyleProfilePage() {
   const [email, setEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [age, setAge] = useState('');
-  const [height, setHeight] = useState("5'10\"");
-  const [weight, setWeight] = useState('72 kg');
-  const [skinTone, setSkinTone] = useState('Warm Olive');
-  const [preferredFit, setPreferredFit] = useState<'Slim' | 'Regular' | 'Relaxed' | 'Oversized'>('Regular');
-  const [favoriteColors, setFavoriteColors] = useState<string[]>([
-    'Navy Blue',
-    'White',
-    'Olive Green',
-    'Charcoal Grey',
-  ]);
-  const [avoidedColors, setAvoidedColors] = useState<string[]>(['Neon Green', 'Bright Orange']);
-  const [stylePrefs, setStylePrefs] = useState<string[]>(['Smart Casual', 'Minimal', 'Modern Indian']);
-  const [comfortPreference, setComfortPreference] = useState<
-    'Maximum Comfort' | 'Balanced' | 'Structure & Sharpness'
-  >('Balanced');
-  const [typicalOccasions, setTypicalOccasions] = useState<string[]>([
-    'Office',
-    'Casual outings',
-    'Dates',
-  ]);
-  const [city, setCity] = useState('Mumbai');
+  const [height, setHeight] = useState('');
+  const [weight, setWeight] = useState('');
+  const [skinTone, setSkinTone] = useState('');
+  const [preferredFit, setPreferredFit] = useState('');
+  const [favoriteColors, setFavoriteColors] = useState<string[]>([]);
+  const [avoidedColors, setAvoidedColors] = useState<string[]>([]);
+  const [stylePrefs, setStylePrefs] = useState<string[]>([]);
+  const [comfortPreference, setComfortPreference] = useState('');
+  const [typicalOccasions, setTypicalOccasions] = useState<string[]>([]);
+  const [city, setCity] = useState('');
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -370,6 +359,7 @@ export default function StyleProfilePage() {
                 onChange={(e) => setSkinTone(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
               >
+                <option value="">Select skin undertone</option>
                 <option value="Fair">Fair</option>
                 <option value="Warm Olive">Warm Olive</option>
                 <option value="Medium Wheatish">Medium Wheatish</option>
@@ -389,6 +379,7 @@ export default function StyleProfilePage() {
                 onChange={(e) => setPreferredFit(e.target.value as any)}
                 className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
               >
+                <option value="">Select preferred fit</option>
                 <option value="Slim">Slim</option>
                 <option value="Regular">Regular</option>
                 <option value="Relaxed">Relaxed</option>
@@ -405,6 +396,7 @@ export default function StyleProfilePage() {
                 onChange={(e) => setCity(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
               >
+                <option value="">Select home city</option>
                 {POPULAR_INDIAN_CITIES.map((c) => (
                   <option key={c.name} value={c.name}>
                     {c.name} ({c.state})

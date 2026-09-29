@@ -212,19 +212,19 @@ export const Repository = {
           .maybeSingle();
 
         if (!existingProfile) {
-          // Create initial empty profile
+          // Create initial clean empty profile (NEVER pre-fill user measurements or preferences)
           await supabaseAdmin.from('profiles').insert({
             user_id: userId,
-            city: 'Mumbai',
-            height: "5'10\"",
-            weight: '72 kg',
-            skin_tone: 'Warm Olive',
-            preferred_fit: 'Regular',
-            favorite_colors: ['Navy Blue', 'White', 'Olive Green', 'Charcoal Grey', 'Beige'],
-            avoided_colors: ['Neon Green', 'Bright Orange'],
-            style_preferences: ['Smart Casual', 'Minimal', 'Modern Indian'],
-            comfort_preference: 'Balanced',
-            typical_occasions: ['Office', 'Casual outings', 'Dates'],
+            city: null,
+            height: null,
+            weight: null,
+            skin_tone: null,
+            preferred_fit: null,
+            favorite_colors: [],
+            avoided_colors: [],
+            style_preferences: [],
+            comfort_preference: null,
+            typical_occasions: [],
             profile_completed: false,
           });
         }
@@ -271,28 +271,20 @@ export const Repository = {
         id: profileData.id,
         user_id: userId,
         email: userRecord?.email || '',
-        name: userRecord?.name || 'Member',
-        full_name: userRecord?.name || 'Member',
+        name: userRecord?.name || '',
+        full_name: userRecord?.name || '',
         mobile_number: userRecord?.mobile_number || '',
         age: userRecord?.age,
-        height: profileData.height || "5'10\"",
-        weight: profileData.weight || '72 kg',
-        skin_tone: profileData.skin_tone || 'Warm Olive',
-        preferred_fit: profileData.preferred_fit || 'Regular',
-        favorite_colors: Array.isArray(profileData.favorite_colors)
-          ? profileData.favorite_colors
-          : ['Navy Blue', 'White', 'Olive Green', 'Charcoal Grey', 'Beige'],
-        avoided_colors: Array.isArray(profileData.avoided_colors)
-          ? profileData.avoided_colors
-          : ['Neon Green', 'Bright Orange'],
-        style_preferences: Array.isArray(profileData.style_preferences)
-          ? profileData.style_preferences
-          : ['Smart Casual', 'Minimal', 'Modern Indian'],
-        comfort_preference: profileData.comfort_preference || 'Balanced',
-        typical_occasions: Array.isArray(profileData.typical_occasions)
-          ? profileData.typical_occasions
-          : ['Office', 'Casual outings', 'Dates'],
-        city: profileData.city || 'Mumbai',
+        height: profileData.height || undefined,
+        weight: profileData.weight || undefined,
+        skin_tone: profileData.skin_tone || undefined,
+        preferred_fit: profileData.preferred_fit || undefined,
+        favorite_colors: Array.isArray(profileData.favorite_colors) ? profileData.favorite_colors : [],
+        avoided_colors: Array.isArray(profileData.avoided_colors) ? profileData.avoided_colors : [],
+        style_preferences: Array.isArray(profileData.style_preferences) ? profileData.style_preferences : [],
+        comfort_preference: profileData.comfort_preference || undefined,
+        typical_occasions: Array.isArray(profileData.typical_occasions) ? profileData.typical_occasions : [],
+        city: profileData.city || undefined,
         profile_completed: Boolean(profileData.profile_completed),
         created_at: profileData.created_at || new Date().toISOString(),
         updated_at: profileData.updated_at || new Date().toISOString(),
@@ -306,32 +298,32 @@ export const Repository = {
       return {
         ...cached,
         email: userRecord?.email || cached.email || '',
-        name: userRecord?.name || cached.name || 'Member',
-        full_name: userRecord?.name || cached.full_name || 'Member',
+        name: userRecord?.name || cached.name || '',
+        full_name: userRecord?.name || cached.full_name || '',
         mobile_number: userRecord?.mobile_number || cached.mobile_number || '',
         age: userRecord?.age || cached.age,
       };
     }
 
-    // Return sensible default profile if not found
+    // Return clean empty profile if not found
     const defaultProfile: UserProfile = {
       id: generateId(),
       user_id: userId,
       email: userRecord?.email || '',
-      name: userRecord?.name || 'Member',
-      full_name: userRecord?.name || 'Member',
+      name: userRecord?.name || '',
+      full_name: userRecord?.name || '',
       mobile_number: userRecord?.mobile_number || '',
       age: userRecord?.age,
-      city: 'Mumbai',
-      height: "5'10\"",
-      weight: '72 kg',
-      skin_tone: 'Warm Olive',
-      preferred_fit: 'Regular',
-      favorite_colors: ['Navy Blue', 'White', 'Olive Green', 'Charcoal Grey', 'Beige'],
-      avoided_colors: ['Neon Green', 'Bright Orange'],
-      style_preferences: ['Smart Casual', 'Minimal', 'Modern Indian'],
-      comfort_preference: 'Balanced',
-      typical_occasions: ['Office', 'Casual outings', 'Dates'],
+      city: undefined,
+      height: undefined,
+      weight: undefined,
+      skin_tone: undefined,
+      preferred_fit: undefined,
+      favorite_colors: [],
+      avoided_colors: [],
+      style_preferences: [],
+      comfort_preference: undefined,
+      typical_occasions: [],
       profile_completed: false,
       created_at: new Date().toISOString(),
     };
@@ -346,7 +338,7 @@ export const Repository = {
       ? normalizeMobileNumber(profileData.mobile_number) || profileData.mobile_number
       : existing?.mobile_number || '';
 
-    const preferredName = (profileData.name || profileData.full_name || existing?.name || existing?.full_name || 'Member').trim();
+    const preferredName = (profileData.name || profileData.full_name || existing?.name || existing?.full_name || '').trim();
     const userAge = profileData.age !== undefined ? Number(profileData.age) : existing?.age;
 
     const updated: UserProfile = {
@@ -357,22 +349,31 @@ export const Repository = {
       full_name: preferredName,
       mobile_number: cleanMobile,
       age: userAge,
-      height: profileData.height ?? existing?.height ?? "5'10\"",
-      weight: profileData.weight ?? existing?.weight ?? '72 kg',
-      skin_tone: profileData.skin_tone ?? existing?.skin_tone ?? 'Warm Olive',
-      preferred_fit: profileData.preferred_fit ?? existing?.preferred_fit ?? 'Regular',
+      height: profileData.height !== undefined ? profileData.height : existing?.height,
+      weight: profileData.weight !== undefined ? profileData.weight : existing?.weight,
+      skin_tone: profileData.skin_tone !== undefined ? profileData.skin_tone : existing?.skin_tone,
+      preferred_fit: profileData.preferred_fit !== undefined ? profileData.preferred_fit : existing?.preferred_fit,
       favorite_colors:
-        profileData.favorite_colors ??
-        existing?.favorite_colors ?? ['Navy Blue', 'White', 'Charcoal Grey'],
-      avoided_colors: profileData.avoided_colors ?? existing?.avoided_colors ?? [],
+        profileData.favorite_colors !== undefined
+          ? profileData.favorite_colors
+          : (existing?.favorite_colors || []),
+      avoided_colors:
+        profileData.avoided_colors !== undefined
+          ? profileData.avoided_colors
+          : (existing?.avoided_colors || []),
       style_preferences:
-        profileData.style_preferences ??
-        existing?.style_preferences ?? ['Smart Casual', 'Minimal'],
-      comfort_preference: profileData.comfort_preference ?? existing?.comfort_preference ?? 'Balanced',
+        profileData.style_preferences !== undefined
+          ? profileData.style_preferences
+          : (existing?.style_preferences || []),
+      comfort_preference:
+        profileData.comfort_preference !== undefined
+          ? profileData.comfort_preference
+          : existing?.comfort_preference,
       typical_occasions:
-        profileData.typical_occasions ??
-        existing?.typical_occasions ?? ['Office', 'Casual outings', 'Dates'],
-      city: profileData.city ?? existing?.city ?? 'Mumbai',
+        profileData.typical_occasions !== undefined
+          ? profileData.typical_occasions
+          : (existing?.typical_occasions || []),
+      city: profileData.city !== undefined ? profileData.city : existing?.city,
       profile_completed:
         profileData.profile_completed !== undefined
           ? profileData.profile_completed
