@@ -16,6 +16,8 @@ dist/
 .env.test.local
 .env.production.local
 *.pem
+client_secret*.json
+Google_cloud_*.txt
 
 # Debug logs
 npm-debug.log*
