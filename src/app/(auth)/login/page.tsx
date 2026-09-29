@@ -11,8 +11,29 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const urlError = searchParams.get('error');
 
-  const [error, setError] = useState(urlError ? decodeURIComponent(urlError) : '');
+  const resolveErrorMessage = (raw: string | null) => {
+    if (!raw) return '';
+    const decoded = decodeURIComponent(raw);
+    if (decoded.includes('access_denied') || decoded.includes('cancelled')) {
+      return 'Google sign-in was cancelled.';
+    }
+    if (decoded.includes('not enabled') || decoded.includes('validation_failed')) {
+      return 'Google sign-in is temporarily unavailable. Please ensure the Google provider is enabled in your Supabase authentication dashboard.';
+    }
+    if (decoded.includes('auth_exchange_failed')) {
+      return 'Unable to complete sign-in. Please try again.';
+    }
+    return decoded;
+  };
+
+  const [error, setError] = useState(resolveErrorMessage(urlError));
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (urlError) {
+      setError(resolveErrorMessage(urlError));
+    }
+  }, [urlError]);
 
   useEffect(() => {
     // Check if user is already authenticated
@@ -33,17 +54,20 @@ function LoginForm() {
   }, [router]);
 
   const handleGoogleSignIn = async () => {
+    if (isLoading) return;
     setIsLoading(true);
     setError('');
 
     try {
       const supabase = createClient();
-      const redirectUrl = `${window.location.origin}/auth/callback`;
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const redirectUrl = `${origin}/auth/callback`;
 
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -54,6 +78,47 @@ function LoginForm() {
       if (oauthError) {
         console.error('Google Sign In Error:', oauthError);
         setError(oauthError.message || 'Unable to sign in with Google. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+
+      if (data?.url) {
+        // Pre-check Supabase OAuth authorization response to prevent navigating to raw JSON error pages
+        try {
+          const checkRes = await fetch(data.url, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json, text/html, */*',
+            },
+          });
+
+          if (checkRes.status === 400) {
+            const errorData = await checkRes.json().catch(() => null);
+            if (
+              errorData?.msg?.toLowerCase().includes('not enabled') ||
+              errorData?.error_code === 'validation_failed'
+            ) {
+              setError(
+                'Google sign-in is temporarily unavailable. The Google provider is not enabled in your Supabase Authentication settings (Authentication → Providers → Google).'
+              );
+            } else {
+              setError(
+                errorData?.msg ||
+                  errorData?.error_description ||
+                  'Google sign-in is temporarily unavailable. Please try again.'
+              );
+            }
+            setIsLoading(false);
+            return;
+          }
+        } catch (preflightErr) {
+          // If a CORS or navigation redirect error occurs during preflight because Supabase redirected to accounts.google.com, that is expected and safe to proceed.
+        }
+
+        // Navigate to the Google OAuth consent endpoint
+        window.location.assign(data.url);
+      } else {
+        setError('Failed to initialize Google authentication.');
         setIsLoading(false);
       }
     } catch (err: any) {

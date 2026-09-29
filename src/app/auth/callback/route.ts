@@ -10,11 +10,18 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get('code');
   const error = requestUrl.searchParams.get('error');
   const errorDescription = requestUrl.searchParams.get('error_description');
-  const origin = requestUrl.origin;
+
+  // Robust origin detection across local dev and Vercel reverse proxy
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https';
+  const origin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : requestUrl.origin;
 
   if (error) {
     console.error('Google OAuth callback error from provider:', error, errorDescription);
-    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(errorDescription || error)}`);
+    const msg = error === 'access_denied' 
+      ? 'Google sign-in was cancelled.' 
+      : (errorDescription || 'Google authentication failed. Please try again.');
+    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(msg)}`);
   }
 
   if (code) {
@@ -24,7 +31,9 @@ export async function GET(request: Request) {
 
       if (exchangeError) {
         console.error('Supabase exchangeCodeForSession error:', exchangeError);
-        return NextResponse.redirect(`${origin}/login?error=auth_exchange_failed`);
+        return NextResponse.redirect(
+          `${origin}/login?error=${encodeURIComponent('Unable to complete Google sign-in. Please try again.')}`
+        );
       }
 
       if (data?.user) {
@@ -62,7 +71,9 @@ export async function GET(request: Request) {
       }
     } catch (err) {
       console.error('OAuth callback unhandled exception:', err);
-      return NextResponse.redirect(`${origin}/login?error=auth_exception`);
+      return NextResponse.redirect(
+        `${origin}/login?error=${encodeURIComponent('An unexpected error occurred during authentication.')}`
+      );
     }
   }
 
