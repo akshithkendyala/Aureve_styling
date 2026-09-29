@@ -11,12 +11,13 @@ create extension if not exists "uuid-ossp";
 create table if not exists public.users (
     id uuid primary key default uuid_generate_v4(),
     name text not null,
-    mobile_number text unique not null,
-    pin_hash text not null,
+    email text unique,
+    mobile_number text,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null,
     updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+create index if not exists idx_users_email on public.users(email);
 create index if not exists idx_users_mobile on public.users(mobile_number);
 
 -- 2. USER PROFILES TABLE (Strict user isolation by user_id)

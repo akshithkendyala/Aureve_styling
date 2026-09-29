@@ -41,8 +41,8 @@ async function runTests() {
     const { data: uSyncA, error: errSyncA } = await supabase.from('users').upsert({
       id: userA_id,
       name: userA_name,
+      email: userA_email,
       mobile_number: '',
-      pin_hash: '',
     }).select('*');
     if (errSyncA) throw new Error('Failed to sync user A: ' + errSyncA.message);
 
@@ -144,8 +144,8 @@ async function runTests() {
     await supabase.from('users').upsert({
       id: userB_id,
       name: userB_name,
+      email: userB_email,
       mobile_number: userB_mobile,
-      pin_hash: '',
     });
     await supabase.from('profiles').upsert({
       user_id: userB_id,

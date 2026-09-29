@@ -95,9 +95,10 @@ export const Repository = {
         }
 
         if (!dbErr && dbUser) {
+          const finalEmail = dbUser.email || authEmail || '';
           const user: User = {
             id: dbUser.id,
-            email: authEmail,
+            email: finalEmail,
             name: dbUser.name || authName || 'Member',
             mobile_number: dbUser.mobile_number || authMobile || '',
             age: authAge,
@@ -105,6 +106,16 @@ export const Repository = {
             created_at: dbUser.created_at,
             updated_at: dbUser.updated_at,
           };
+
+          // If dbUser doesn't have email stored in public.users yet but authEmail is known, backfill it
+          if (!dbUser.email && authEmail) {
+            try {
+              await supabaseAdmin.from('users').update({ email: authEmail }).eq('id', dbUser.id);
+            } catch {
+              // Ignore backfill error if column does not exist yet
+            }
+          }
+
           dbStore.users.set(user.id, user);
           return user;
         } else if (authEmail) {
@@ -124,8 +135,9 @@ export const Repository = {
               {
                 id: user.id,
                 name: user.name,
+                email: user.email,
                 mobile_number: user.mobile_number || '',
-                pin_hash: '',
+                updated_at: new Date().toISOString(),
               },
               { onConflict: 'id' }
             );
@@ -193,8 +205,8 @@ export const Repository = {
           {
             id: userId,
             name,
+            email: authUser.email || '',
             mobile_number: mobileNumber || '',
-            pin_hash: '',
             updated_at: new Date().toISOString(),
           },
           { onConflict: 'id' }
@@ -385,14 +397,18 @@ export const Repository = {
     if (isSupabaseConfigured && supabaseAdmin) {
       // 1. Sync public.users first (due to foreign key constraint)
       try {
+        const userUpdatePayload: Record<string, any> = {
+          id: userId,
+          name: preferredName,
+          mobile_number: cleanMobile || '',
+          updated_at: new Date().toISOString(),
+        };
+        if (updated.email) {
+          userUpdatePayload.email = updated.email;
+        }
+
         await supabaseAdmin.from('users').upsert(
-          {
-            id: userId,
-            name: preferredName,
-            mobile_number: cleanMobile || '',
-            pin_hash: '',
-            updated_at: new Date().toISOString(),
-          },
+          userUpdatePayload,
           { onConflict: 'id' }
         );
 
