@@ -198,7 +198,7 @@ export default function LooksHistoryPage() {
                       </span>
                       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-white mb-1.5">
                         <Image
-                          src={item.image_url}
+                          src={item.image_url || 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80'}
                           alt={item.name}
                           fill
                           className="object-cover"

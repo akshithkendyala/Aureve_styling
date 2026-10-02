@@ -51,7 +51,7 @@ export function AlternativeLooks({ alternatives, onSelectAlternative }: Alternat
                       className="relative w-14 h-18 rounded-xl overflow-hidden bg-[#F4EFEA] border border-[#E8DFD5] flex-shrink-0"
                     >
                       <Image
-                        src={item.image_url}
+                        src={item.image_url || 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80'}
                         alt={item.name}
                         fill
                         className="object-cover"

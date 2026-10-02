@@ -84,7 +84,7 @@ export function OutfitResultCard({
               </span>
               <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-white mb-2 shadow-xs">
                 <Image
-                  src={topItem.image_url}
+                  src={topItem.image_url || 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80'}
                   alt={topItem.name}
                   fill
                   className="object-cover"
@@ -107,7 +107,7 @@ export function OutfitResultCard({
               </span>
               <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-white mb-2 shadow-xs">
                 <Image
-                  src={bottomItem.image_url}
+                  src={bottomItem.image_url || 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80'}
                   alt={bottomItem.name}
                   fill
                   className="object-cover"
@@ -130,7 +130,7 @@ export function OutfitResultCard({
               </span>
               <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-white mb-2 shadow-xs">
                 <Image
-                  src={footwearItem.image_url}
+                  src={footwearItem.image_url || 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80'}
                   alt={footwearItem.name}
                   fill
                   className="object-cover"
@@ -153,7 +153,7 @@ export function OutfitResultCard({
               </span>
               <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-white mb-2 shadow-xs">
                 <Image
-                  src={layerItem.image_url}
+                  src={layerItem.image_url || 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80'}
                   alt={layerItem.name}
                   fill
                   className="object-cover"
@@ -173,7 +173,7 @@ export function OutfitResultCard({
               </span>
               <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-white mb-2 shadow-xs">
                 <Image
-                  src={accessoryItems[0].image_url}
+                  src={accessoryItems[0].image_url || 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80'}
                   alt={accessoryItems[0].name}
                   fill
                   className="object-cover"

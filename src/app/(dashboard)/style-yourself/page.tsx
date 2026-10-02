@@ -412,7 +412,7 @@ function StyleYourselfContent() {
                     >
                       <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden bg-[#FAF8F5] mb-2 shadow-2xs">
                         <Image
-                          src={item.image_url}
+                          src={item.image_url || 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80'}
                           alt={item.name}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform"
@@ -504,7 +504,7 @@ function StyleYourselfContent() {
                 {selectedTop ? (
                   <div className="flex items-center space-x-2.5 mt-2">
                     <div className="relative w-12 h-14 rounded-lg overflow-hidden bg-white flex-shrink-0 shadow-2xs">
-                      <Image src={selectedTop.image_url} alt={selectedTop.name} fill className="object-cover" />
+                      <Image src={selectedTop.image_url || 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80'} alt={selectedTop.name} fill className="object-cover" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold text-[#18181B] line-clamp-1">{selectedTop.name}</p>
@@ -536,7 +536,7 @@ function StyleYourselfContent() {
                 {selectedBottom ? (
                   <div className="flex items-center space-x-2.5 mt-2">
                     <div className="relative w-12 h-14 rounded-lg overflow-hidden bg-white flex-shrink-0 shadow-2xs">
-                      <Image src={selectedBottom.image_url} alt={selectedBottom.name} fill className="object-cover" />
+                      <Image src={selectedBottom.image_url || 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80'} alt={selectedBottom.name} fill className="object-cover" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold text-[#18181B] line-clamp-1">{selectedBottom.name}</p>
@@ -568,7 +568,7 @@ function StyleYourselfContent() {
                 {selectedFootwear ? (
                   <div className="flex items-center space-x-2.5 mt-1">
                     <div className="relative w-10 h-12 rounded-lg overflow-hidden bg-white flex-shrink-0 shadow-2xs">
-                      <Image src={selectedFootwear.image_url} alt={selectedFootwear.name} fill className="object-cover" />
+                      <Image src={selectedFootwear.image_url || 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80'} alt={selectedFootwear.name} fill className="object-cover" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold text-[#18181B] line-clamp-1">{selectedFootwear.name}</p>
@@ -600,7 +600,7 @@ function StyleYourselfContent() {
                 {selectedLayer ? (
                   <div className="flex items-center space-x-2.5 mt-1">
                     <div className="relative w-10 h-12 rounded-lg overflow-hidden bg-white flex-shrink-0 shadow-2xs">
-                      <Image src={selectedLayer.image_url} alt={selectedLayer.name} fill className="object-cover" />
+                      <Image src={selectedLayer.image_url || 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80'} alt={selectedLayer.name} fill className="object-cover" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold text-[#18181B] line-clamp-1">{selectedLayer.name}</p>
@@ -611,7 +611,7 @@ function StyleYourselfContent() {
                   <div className="flex items-center space-x-1.5 mt-1">
                     {selectedAccessories.map((acc) => (
                       <div key={acc.id} className="relative w-8 h-10 rounded-md overflow-hidden bg-white shadow-2xs">
-                        <Image src={acc.image_url} alt={acc.name} fill className="object-cover" />
+                        <Image src={acc.image_url || 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80'} alt={acc.name} fill className="object-cover" />
                       </div>
                     ))}
                   </div>

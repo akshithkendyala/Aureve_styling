@@ -78,6 +78,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/create-outfit') ||
     pathname.startsWith('/looks') ||
     pathname.startsWith('/style-profile') ||
+    pathname.startsWith('/style-yourself') ||
     pathname.startsWith('/settings') ||
     pathname.startsWith('/onboarding');
 
