@@ -162,8 +162,14 @@ export function isItemPermittedForOccasion(
 
 /**
  * Calculate Color Harmony Score between items (0 to 25)
+ * Seamlessly incorporates user skin undertones for tailored color contrast.
  */
-function evaluateColorHarmony(top: WardrobeItem, bottom: WardrobeItem, footwear?: WardrobeItem): number {
+function evaluateColorHarmony(
+  top: WardrobeItem,
+  bottom: WardrobeItem,
+  footwear?: WardrobeItem,
+  skinTone?: string
+): number {
   const topColor = top.primary_color.toLowerCase();
   const bottomColor = bottom.primary_color.toLowerCase();
   const footColor = footwear?.primary_color.toLowerCase() || '';
@@ -199,6 +205,79 @@ function evaluateColorHarmony(top: WardrobeItem, bottom: WardrobeItem, footwear?
     }
     if (footColor.includes('white') && (bottomColor.includes('blue') || bottomColor.includes('black') || bottomColor.includes('grey'))) {
       score += 3; // Clean white sneakers
+    }
+  }
+
+  // Skin Undertone Harmony Enhancement (+3 bonus for top colors that frame the face harmoniously)
+  if (skinTone) {
+    const normSkin = skinTone.toLowerCase();
+    if (normSkin.includes('warm olive')) {
+      // Flattered by warm earthy tones, deep navy, olive, rust, burgundy, warm beige
+      if (
+        topColor.includes('olive') ||
+        topColor.includes('green') ||
+        topColor.includes('terracotta') ||
+        topColor.includes('rust') ||
+        topColor.includes('navy') ||
+        topColor.includes('beige') ||
+        topColor.includes('mustard') ||
+        topColor.includes('maroon') ||
+        topColor.includes('burgundy')
+      ) {
+        score += 3;
+      }
+    } else if (normSkin.includes('medium wheatish')) {
+      // Flattered by deep rich jewel neutrals, royal blue, navy, emerald, wine, crisp white
+      if (
+        topColor.includes('navy') ||
+        topColor.includes('blue') ||
+        topColor.includes('emerald') ||
+        topColor.includes('green') ||
+        topColor.includes('burgundy') ||
+        topColor.includes('white') ||
+        topColor.includes('charcoal')
+      ) {
+        score += 3;
+      }
+    } else if (normSkin.includes('dusky')) {
+      // Flattered by high-contrast vivids, crisp white, cobalt blue, terracotta, mustard, gold, rich purple
+      if (
+        topColor.includes('white') ||
+        topColor.includes('off-white') ||
+        topColor.includes('blue') ||
+        topColor.includes('terracotta') ||
+        topColor.includes('mustard') ||
+        topColor.includes('emerald') ||
+        topColor.includes('sage')
+      ) {
+        score += 3;
+      }
+    } else if (normSkin.includes('deep tan')) {
+      // Flattered by warm earth tones, deep jewel hues, caramel, burgundy, rich navy, off-white
+      if (
+        topColor.includes('caramel') ||
+        topColor.includes('brown') ||
+        topColor.includes('olive') ||
+        topColor.includes('burgundy') ||
+        topColor.includes('navy') ||
+        topColor.includes('off-white') ||
+        topColor.includes('cream')
+      ) {
+        score += 3;
+      }
+    } else if (normSkin.includes('fair')) {
+      // Flattered by rich deep contrasts & cool tones: navy, charcoal, slate grey, forest green, pastel blue
+      if (
+        topColor.includes('navy') ||
+        topColor.includes('charcoal') ||
+        topColor.includes('black') ||
+        topColor.includes('slate') ||
+        topColor.includes('grey') ||
+        topColor.includes('forest') ||
+        topColor.includes('sky blue')
+      ) {
+        score += 3;
+      }
     }
   }
 
@@ -289,10 +368,42 @@ function generateRankedCandidates(
           score += 10;
         }
 
-        // 2. Color harmony (+25)
-        score += evaluateColorHarmony(top, bottom, footwear);
+        // 2. Color harmony & Skin Undertone alignment (+25)
+        score += evaluateColorHarmony(top, bottom, footwear, userProfile?.skin_tone);
 
-        // 3. Weather Suitability (+10 / -15)
+        // 3. Silhouette & Body Build Proportion Harmony (+6)
+        if (userProfile?.body_build) {
+          const build = userProfile.body_build.toLowerCase();
+          const topFit = (top.fit || 'Regular').toLowerCase();
+          const bottomFit = (bottom.fit || 'Regular').toLowerCase();
+
+          if (build === 'broad') {
+            // Broad frames benefit from structured regular tops and straight/relaxed bottoms
+            if (topFit === 'regular' || topFit === 'relaxed') score += 3;
+            if (bottomFit === 'regular' || bottomFit === 'relaxed' || bottomFit === 'wide') score += 3;
+          } else if (build === 'athletic') {
+            // Athletic builds look great with tailored/slim tops and tapered or slim-straight bottoms
+            if (topFit === 'slim' || topFit === 'tailored' || topFit === 'regular') score += 3;
+            if (bottomFit === 'slim' || bottomFit === 'tailored' || bottomFit === 'regular') score += 3;
+          } else if (build === 'slim') {
+            // Slim frames look great with subtle layering, regular tops, and straight bottoms
+            if (topFit === 'regular' || topFit === 'relaxed' || layer) score += 3;
+            if (bottomFit === 'regular' || bottomFit === 'straight') score += 3;
+          } else if (build === 'medium') {
+            // Medium frames are versatile
+            score += 4;
+          }
+        }
+
+        // 3b. Preferred Fit alignment (+4)
+        if (userProfile?.preferred_fit) {
+          const pref = userProfile.preferred_fit.toLowerCase();
+          if ((top.fit || '').toLowerCase().includes(pref) || (bottom.fit || '').toLowerCase().includes(pref)) {
+            score += 4;
+          }
+        }
+
+        // 4. Weather Suitability (+10 / -15)
         if (isHot) {
           if ((top.material || '').toLowerCase().includes('linen') || (top.material || '').toLowerCase().includes('cotton')) score += 6;
           if (layer) score -= 15;
@@ -304,12 +415,12 @@ function generateRankedCandidates(
           if ((bottom.primary_color || '').toLowerCase().includes('white')) score -= 15;
         }
 
-        // 4. Anti-Repetition Penalty (-40 for exact repeats)
+        // 5. Anti-Repetition Penalty (-40 for exact repeats)
         if (recentFingerprints.has(fingerprint)) {
           score -= 40;
         }
 
-        // 5. User Profile static preferences (+5 / -20)
+        // 6. User Profile static preferences (+5 / -20)
         if (userProfile?.favorite_colors) {
           if (userProfile.favorite_colors.some((fc) => top.primary_color.toLowerCase().includes(fc.toLowerCase()) || bottom.primary_color.toLowerCase().includes(fc.toLowerCase()))) {
             score += 4;
@@ -321,7 +432,7 @@ function generateRankedCandidates(
           }
         }
 
-        // 6. Dynamic Personal Style Learning & Feedback Score (+/- 35)
+        // 7. Dynamic Personal Style Learning & Feedback Score (+/- 35)
         let personalReasons: string[] = [];
         if (learnedProfile && learnedProfile.totalFeedbacks > 0) {
           const fbResult = calculateFeedbackScore(
@@ -647,29 +758,31 @@ STRICT OCCASION RULES:
         ...rule.forbiddenFootwearSubcategories,
       ].join(', ')}.
 - Weather Context: ${weather ? `${weather.city}, ${weather.temperature}°C, ${weather.condition}` : '28°C pleasant'}.
+- User Profile: Skin Undertone: ${userProfile?.skin_tone || 'Warm Neutral'}, Body Build: ${userProfile?.body_build || 'Proportional'}, Preferred Fit: ${userProfile?.preferred_fit || 'Regular'}.
 
 ALLOWED USER WARDROBE PIECES:
 Tops:
-${topOptionsForPrompt.map((t) => `- ID: "${t.id}" | Name: "${t.name}" | Color: ${t.primary_color} | Subcategory: ${t.subcategory} | Material: ${t.material}`).join('\n')}
+${topOptionsForPrompt.map((t) => `- ID: "${t.id}" | Name: "${t.name}" | Color: ${t.primary_color} | Subcategory: ${t.subcategory} | Material: ${t.material} | Fit: ${t.fit || 'Regular'}`).join('\n')}
 
 Bottoms:
-${bottomOptionsForPrompt.map((b) => `- ID: "${b.id}" | Name: "${b.name}" | Color: ${b.primary_color} | Subcategory: ${b.subcategory}`).join('\n')}
+${bottomOptionsForPrompt.map((b) => `- ID: "${b.id}" | Name: "${b.name}" | Color: ${b.primary_color} | Subcategory: ${b.subcategory} | Fit: ${b.fit || 'Regular'}`).join('\n')}
 
 Footwear:
 ${footwearOptionsForPrompt.map((f) => `- ID: "${f.id}" | Name: "${f.name}" | Color: ${f.primary_color} | Subcategory: ${f.subcategory}`).join('\n')}
 
 MANDATORY INSTRUCTIONS:
 1. Select the most elegant, occasion-appropriate Top ID, Bottom ID, and Footwear ID from the lists above.
-2. For PARTY, select stylish modern shirts / overshirts with clean jeans/chinos and sneakers/boots. NEVER select Kurta or Sandals.
-3. For INTERVIEW, select formal shirts, formal trousers, and formal shoes. NEVER select sneakers or t-shirts.
-4. Return STRICT JSON:
+2. Consider the user's skin undertone (${userProfile?.skin_tone || 'Warm Neutral'}) for color contrast near the face, and body build (${userProfile?.body_build || 'Proportional'}) for balanced visual silhouette proportions.
+3. For PARTY, select stylish modern shirts / overshirts with clean jeans/chinos and sneakers/boots. NEVER select Kurta or Sandals.
+4. For INTERVIEW, select formal shirts, formal trousers, and formal shoes. NEVER select sneakers or t-shirts.
+5. Return STRICT JSON:
 {
   "title": "Editorial title (e.g., Modern Night-Out Styling)",
   "selected_top_id": "EXACT_ID_FROM_TOPS",
   "selected_bottom_id": "EXACT_ID_FROM_BOTTOMS",
   "selected_footwear_id": "EXACT_ID_FROM_FOOTWEAR",
   "style_direction": ["Modern", "Classy", "Confident"],
-  "ai_explanation": "2 concise sentences explaining why this exact combination works beautifully for this real-world occasion."
+  "ai_explanation": "2 concise sentences explaining why this exact combination works beautifully for this real-world occasion and flatters the user's undertone/proportions."
 }
 `;
 

@@ -120,6 +120,48 @@ export interface User {
   updated_at?: string;
 }
 
+export type SkinUndertoneCategory =
+  | 'Warm Olive'
+  | 'Medium Wheatish'
+  | 'Dusky'
+  | 'Deep Tan'
+  | 'Fair';
+
+export type BodyBuildCategory = 'Slim' | 'Athletic' | 'Medium' | 'Broad';
+
+export interface SkinScanResult {
+  success: boolean;
+  skin_undertone?: SkinUndertoneCategory;
+  confidence?: number;
+  undertone_nuance?: string;
+  styling_advice?: string;
+  quality_checks?: {
+    face_detected: boolean;
+    face_centered: boolean;
+    lighting_adequate: boolean;
+    quality_ok: boolean;
+  };
+  rejection_reason?: string;
+  error?: string;
+}
+
+export interface BodyScanResult {
+  success: boolean;
+  body_build?: BodyBuildCategory;
+  confidence?: number;
+  silhouette_characteristics?: string;
+  proportion_advice?: string;
+  quality_checks?: {
+    full_body_detected: boolean;
+    head_visible: boolean;
+    feet_visible: boolean;
+    lighting_adequate: boolean;
+    quality_ok: boolean;
+  };
+  rejection_reason?: string;
+  error?: string;
+}
+
 export interface UserProfile {
   id: string;
   user_id: string; // Supabase auth.users.id
@@ -130,8 +172,10 @@ export interface UserProfile {
   age?: number; // Required user age
   height?: string; // e.g., "5'10\"" or "178 cm"
   weight?: string; // e.g., "72 kg" or "158 lb"
-  body_build?: 'Slim' | 'Athletic' | 'Medium' | 'Broad' | string;
-  skin_tone?: string; // e.g., "Warm Olive", "Dusky", "Fair", "Deep Tan"
+  body_build?: BodyBuildCategory | string;
+  body_scan_confidence?: number;
+  skin_tone?: SkinUndertoneCategory | string; // e.g., "Warm Olive", "Dusky", "Fair", "Deep Tan"
+  skin_scan_confidence?: number;
   preferred_fit?: 'Slim' | 'Regular' | 'Relaxed' | 'Oversized';
   favorite_colors: string[];
   avoided_colors: string[];

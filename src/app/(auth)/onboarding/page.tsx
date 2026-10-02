@@ -20,9 +20,14 @@ import {
   Layers,
   Ruler,
   Weight,
+  Camera,
+  RotateCcw,
 } from 'lucide-react';
 import { POPULAR_INDIAN_CITIES } from '@/lib/weather/weatherService';
 import { isValidIndianMobile, normalizeMobileNumber } from '@/lib/auth/mobile';
+import { SkinUndertoneCategory, BodyBuildCategory } from '@/lib/types';
+import SkinScanModal from '@/components/profile/SkinScanModal';
+import BodyScanModal from '@/components/profile/BodyScanModal';
 
 const SKIN_TONES = [
   { label: 'Warm Olive', color: '#BCA07D', desc: 'Golden / yellow undertones' },
@@ -117,8 +122,14 @@ export default function OnboardingPage() {
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
   const [weightVal, setWeightVal] = useState('');
   const [bodyBuild, setBodyBuild] = useState('');
+  const [bodyScanConfidence, setBodyScanConfidence] = useState<number | undefined>(undefined);
   const [skinTone, setSkinTone] = useState('');
+  const [skinScanConfidence, setSkinScanConfidence] = useState<number | undefined>(undefined);
   const [preferredFit, setPreferredFit] = useState('');
+
+  // Scanner Modals State
+  const [isSkinScanModalOpen, setIsSkinScanModalOpen] = useState(false);
+  const [isBodyScanModalOpen, setIsBodyScanModalOpen] = useState(false);
 
   // Step 3: Color Palette & Aesthetics (Starts empty array)
   const [favoriteColors, setFavoriteColors] = useState<string[]>([]);
@@ -251,7 +262,9 @@ export default function OnboardingPage() {
             if (p.height) parseSavedHeight(p.height);
             if (p.weight) parseSavedWeight(p.weight);
             if (p.body_build) setBodyBuild(p.body_build);
+            if (p.body_scan_confidence !== undefined) setBodyScanConfidence(p.body_scan_confidence);
             if (p.skin_tone) setSkinTone(p.skin_tone);
+            if (p.skin_scan_confidence !== undefined) setSkinScanConfidence(p.skin_scan_confidence);
             if (p.preferred_fit) setPreferredFit(p.preferred_fit);
             if (p.favorite_colors && p.favorite_colors.length > 0) setFavoriteColors(p.favorite_colors);
             if (p.avoided_colors && p.avoided_colors.length > 0) setAvoidedColors(p.avoided_colors);
@@ -277,7 +290,9 @@ export default function OnboardingPage() {
               if (draft.weightUnit) setWeightUnit(draft.weightUnit);
               if (draft.weightVal) setWeightVal(draft.weightVal);
               if (draft.bodyBuild) setBodyBuild(draft.bodyBuild);
+              if (draft.bodyScanConfidence !== undefined) setBodyScanConfidence(draft.bodyScanConfidence);
               if (draft.skinTone) setSkinTone(draft.skinTone);
+              if (draft.skinScanConfidence !== undefined) setSkinScanConfidence(draft.skinScanConfidence);
               if (draft.preferredFit) setPreferredFit(draft.preferredFit);
               if (Array.isArray(draft.favoriteColors) && draft.favoriteColors.length > 0) {
                 setFavoriteColors(draft.favoriteColors);
@@ -328,7 +343,9 @@ export default function OnboardingPage() {
           weightUnit,
           weightVal,
           bodyBuild,
+          bodyScanConfidence,
           skinTone,
+          skinScanConfidence,
           preferredFit,
           favoriteColors,
           avoidedColors,
@@ -506,7 +523,9 @@ export default function OnboardingPage() {
           height: finalHeight,
           weight: finalWeight,
           body_build: bodyBuild,
+          body_scan_confidence: bodyScanConfidence,
           skin_tone: skinTone,
+          skin_scan_confidence: skinScanConfidence,
           preferred_fit: preferredFit,
           favorite_colors: favoriteColors,
           avoided_colors: avoidedColors,
@@ -740,7 +759,7 @@ export default function OnboardingPage() {
 
         {/* STEP 2: PROPORTIONS, BUILD & FIT */}
         {currentStep === 2 && (
-          <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6 shadow-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-7 shadow-md animate-in fade-in duration-300">
             <div className="border-b border-[#F4EFEA] pb-4 space-y-1">
               <div className="flex items-center space-x-2 text-[#7E6047]">
                 <Layers className="w-4 h-4 text-[#9A7B5F]" />
@@ -750,12 +769,154 @@ export default function OnboardingPage() {
                 Proportions & Silhouette
               </h2>
               <p className="text-xs text-[#7E6047]">
-                AUREVÉ calculates silhouette balance, drape, and break length without assuming any default measurements.
+                AUREVÉ analyzes your facial undertone and body silhouette to personalize color contrast, garment drape, and outfit proportions.
               </p>
             </div>
 
-            {/* Height Section */}
-            <div className="space-y-2">
+            {/* A. SKIN UNDERTONE — AI FACE SCAN & SELECTION */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#18181B] flex items-center space-x-1.5">
+                  <Palette className="w-3.5 h-3.5 text-[#9A7B5F]" />
+                  <span>Skin Undertone (For Color Contrast Recommendations) <span className="text-rose-600 font-bold">*</span></span>
+                </label>
+                {skinScanConfidence && skinTone && (
+                  <span className="inline-flex items-center space-x-1 text-[11px] font-semibold text-[#9A7B5F] bg-[#FAF8F5] px-2.5 py-0.5 rounded-full border border-[#EBE5DB]">
+                    <Sparkles className="w-3 h-3 text-[#9A7B5F]" />
+                    <span>AI Calibrated ({Math.round(skinScanConfidence * 100)}% Match)</span>
+                  </span>
+                )}
+              </div>
+
+              {/* AI Skin Undertone Scanner Action Banner */}
+              <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#EBE5DB] flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:border-[#9A7B5F]/50">
+                <div className="space-y-0.5">
+                  <div className="flex items-center space-x-2">
+                    <Camera className="w-4 h-4 text-[#9A7B5F]" />
+                    <span className="text-xs font-serif font-semibold text-[#18181B]">
+                      {skinScanConfidence ? 'Calibrated with AUREVÉ AI Face Scan' : 'Scan Your Skin Undertone'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#7E6047]">
+                    {skinScanConfidence
+                      ? `Detected undertone: ${skinTone}. You can freely change or scan again.`
+                      : 'Not sure about your undertone? Let AUREVÉ analyze it for you.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSkinScanModalOpen(true)}
+                  className="px-4 py-2.5 bg-[#18181B] hover:bg-[#27272A] text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center space-x-1.5 shadow-sm self-start sm:self-auto flex-shrink-0"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-[#9A7B5F]" />
+                  <span>{skinScanConfidence ? 'Scan Again' : 'Scan Skin Undertone'}</span>
+                </button>
+              </div>
+
+              {/* 5 Selectable Skin Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                {SKIN_TONES.map((st) => {
+                  const isSelected = skinTone === st.label;
+                  return (
+                    <button
+                      key={st.label}
+                      type="button"
+                      onClick={() => setSkinTone(st.label)}
+                      className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between space-y-2 ${
+                        isSelected
+                          ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm ring-1 ring-[#18181B]'
+                          : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span
+                          className="w-5 h-5 rounded-full border border-black/10 flex-shrink-0 shadow-xs"
+                          style={{ backgroundColor: st.color }}
+                        />
+                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold leading-tight block">{st.label}</span>
+                        <span className={`text-[9px] block mt-0.5 ${isSelected ? 'text-white/70' : 'text-[#9A7B5F]'}`}>
+                          {st.desc}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* B. BODY BUILD / SILHOUETTE — AI FULL-BODY SCAN & SELECTION */}
+            <div className="space-y-3 pt-2 border-t border-[#F4EFEA]">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#18181B] flex items-center space-x-1.5">
+                  <User className="w-3.5 h-3.5 text-[#9A7B5F]" />
+                  <span>Body Build / Silhouette (For Silhouette & Drape Balance) <span className="text-rose-600 font-bold">*</span></span>
+                </label>
+                {bodyScanConfidence && bodyBuild && (
+                  <span className="inline-flex items-center space-x-1 text-[11px] font-semibold text-[#9A7B5F] bg-[#FAF8F5] px-2.5 py-0.5 rounded-full border border-[#EBE5DB]">
+                    <Sparkles className="w-3 h-3 text-[#9A7B5F]" />
+                    <span>AI Calibrated ({Math.round(bodyScanConfidence * 100)}% Match)</span>
+                  </span>
+                )}
+              </div>
+
+              {/* AI Body Build Scanner Action Banner */}
+              <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#EBE5DB] flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:border-[#9A7B5F]/50">
+                <div className="space-y-0.5">
+                  <div className="flex items-center space-x-2">
+                    <Camera className="w-4 h-4 text-[#9A7B5F]" />
+                    <span className="text-xs font-serif font-semibold text-[#18181B]">
+                      {bodyScanConfidence ? 'Calibrated with AUREVÉ Full-Body Scan' : 'Scan Your Body Build'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#7E6047]">
+                    {bodyScanConfidence
+                      ? `Detected build: ${bodyBuild} Build. You can freely change or scan again.`
+                      : 'Let AUREVÉ understand your silhouette to improve outfit proportions.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsBodyScanModalOpen(true)}
+                  className="px-4 py-2.5 bg-[#18181B] hover:bg-[#27272A] text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center space-x-1.5 shadow-sm self-start sm:self-auto flex-shrink-0"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-[#9A7B5F]" />
+                  <span>{bodyScanConfidence ? 'Scan Again' : 'Scan Body Build'}</span>
+                </button>
+              </div>
+
+              {/* 4 Selectable Build Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {BUILD_OPTIONS.map((b) => {
+                  const isSelected = bodyBuild === b.label;
+                  return (
+                    <button
+                      key={b.label}
+                      type="button"
+                      onClick={() => setBodyBuild(b.label)}
+                      className={`p-4 rounded-2xl border text-left transition-all ${
+                        isSelected
+                          ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm ring-1 ring-[#18181B]'
+                          : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-serif text-sm font-semibold">{b.label} Build</span>
+                        {isSelected && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                      </div>
+                      <p className={`text-[11px] ${isSelected ? 'text-[#FAF8F5]/80' : 'text-[#7E6047]'}`}>
+                        {b.desc}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* C. HEIGHT (Manual input) */}
+            <div className="space-y-2 pt-2 border-t border-[#F4EFEA]">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold uppercase tracking-wider text-[#18181B] flex items-center space-x-1.5">
                   <Ruler className="w-3.5 h-3.5 text-[#7E6047]" />
@@ -841,8 +1002,8 @@ export default function OnboardingPage() {
               )}
             </div>
 
-            {/* Weight Section */}
-            <div className="space-y-2">
+            {/* D. WEIGHT (Manual input) */}
+            <div className="space-y-2 pt-2 border-t border-[#F4EFEA]">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold uppercase tracking-wider text-[#18181B] flex items-center space-x-1.5">
                   <Weight className="w-3.5 h-3.5 text-[#7E6047]" />
@@ -892,75 +1053,8 @@ export default function OnboardingPage() {
               </div>
             </div>
 
-            {/* Body Build */}
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B] mb-2">
-                Body Build / Silhouette <span className="text-rose-600 font-bold">*</span>
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {BUILD_OPTIONS.map((b) => {
-                  const isSelected = bodyBuild === b.label;
-                  return (
-                    <button
-                      key={b.label}
-                      type="button"
-                      onClick={() => setBodyBuild(b.label)}
-                      className={`p-4 rounded-2xl border text-left transition-all ${
-                        isSelected
-                          ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
-                          : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-serif text-sm font-semibold">{b.label} Build</span>
-                        {isSelected && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-                      </div>
-                      <p className={`text-[11px] ${isSelected ? 'text-[#FAF8F5]/80' : 'text-[#7E6047]'}`}>
-                        {b.desc}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Skin Undertone */}
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B] mb-2">
-                Skin Undertone (For Color Contrast Recommendations) <span className="text-rose-600 font-bold">*</span>
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-                {SKIN_TONES.map((st) => {
-                  const isSelected = skinTone === st.label;
-                  return (
-                    <button
-                      key={st.label}
-                      type="button"
-                      onClick={() => setSkinTone(st.label)}
-                      className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between space-y-2 ${
-                        isSelected
-                          ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
-                          : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
-                      }`}
-                    >
-                      <span
-                        className="w-5 h-5 rounded-full border border-black/10 flex-shrink-0"
-                        style={{ backgroundColor: st.color }}
-                      />
-                      <div>
-                        <span className="text-xs font-semibold leading-tight block">{st.label}</span>
-                        <span className={`text-[9px] block mt-0.5 ${isSelected ? 'text-white/70' : 'text-[#9A7B5F]'}`}>
-                          {st.desc}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Preferred Clothing Fit */}
-            <div>
+            {/* E. PREFERRED CLOTHING FIT (Manual selection) */}
+            <div className="pt-2 border-t border-[#F4EFEA]">
               <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B] mb-2">
                 Preferred Clothing Fit <span className="text-rose-600 font-bold">*</span>
               </label>
@@ -974,7 +1068,7 @@ export default function OnboardingPage() {
                       onClick={() => setPreferredFit(f.label)}
                       className={`p-4 rounded-2xl border text-left transition-all ${
                         isSelected
-                          ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm'
+                          ? 'border-[#18181B] bg-[#18181B] text-white shadow-sm ring-1 ring-[#18181B]'
                           : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
                       }`}
                     >
@@ -1302,6 +1396,29 @@ export default function OnboardingPage() {
           <span>Your styling preferences are securely encrypted and private to your account.</span>
         </div>
       </div>
+
+      {/* AI Calibration Modals */}
+      <SkinScanModal
+        isOpen={isSkinScanModalOpen}
+        onClose={() => setIsSkinScanModalOpen(false)}
+        currentUndertone={skinTone}
+        onApplyResult={(detectedTone, confidence) => {
+          setSkinTone(detectedTone);
+          setSkinScanConfidence(confidence);
+          setStepError('');
+        }}
+      />
+
+      <BodyScanModal
+        isOpen={isBodyScanModalOpen}
+        onClose={() => setIsBodyScanModalOpen(false)}
+        currentBuild={bodyBuild}
+        onApplyResult={(detectedBuild, confidence) => {
+          setBodyBuild(detectedBuild);
+          setBodyScanConfidence(confidence);
+          setStepError('');
+        }}
+      />
     </div>
   );
 }

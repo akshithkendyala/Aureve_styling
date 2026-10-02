@@ -70,7 +70,10 @@ const COOL_COLORS = new Set([
 /**
  * 1. Calculate Color Harmony Score (0 to 10)
  */
-export function evaluateColorHarmony(items: WardrobeItem[]): { score: number; notes: string[] } {
+export function evaluateColorHarmony(
+  items: WardrobeItem[],
+  skinTone?: string
+): { score: number; notes: string[] } {
   const colors = items.map((i) => (i.primary_color || '').toLowerCase().trim()).filter(Boolean);
   const notes: string[] = [];
 
@@ -108,6 +111,30 @@ export function evaluateColorHarmony(items: WardrobeItem[]): { score: number; no
   if (hasBlack && hasBrown) {
     // Brown + black is modern when deliberate, but slight nuance
     notes.push('Earthy brown with dark charcoal provides subtle organic contrast.');
+  }
+
+  // Skin Undertone Harmony Commentary
+  if (skinTone) {
+    const top = items.find((i) => i.category === 'tops');
+    const topColor = (top?.primary_color || '').toLowerCase();
+    const normSkin = skinTone.toLowerCase();
+
+    if (normSkin.includes('warm olive') && (topColor.includes('olive') || topColor.includes('rust') || topColor.includes('navy') || topColor.includes('beige'))) {
+      score += 0.4;
+      notes.push(`Top color complements your Warm Olive undertone effortlessly.`);
+    } else if (normSkin.includes('medium wheatish') && (topColor.includes('navy') || topColor.includes('blue') || topColor.includes('white') || topColor.includes('burgundy'))) {
+      score += 0.4;
+      notes.push(`Rich contrast flatters your Medium Wheatish undertone.`);
+    } else if (normSkin.includes('dusky') && (topColor.includes('white') || topColor.includes('blue') || topColor.includes('terracotta') || topColor.includes('mustard'))) {
+      score += 0.4;
+      notes.push(`Crisp tone creates vibrant, sophisticated contrast against your Dusky undertone.`);
+    } else if (normSkin.includes('deep tan') && (topColor.includes('caramel') || topColor.includes('olive') || topColor.includes('burgundy') || topColor.includes('navy'))) {
+      score += 0.4;
+      notes.push(`Warm tonal depth harmonizes beautifully with your Deep Tan skin tone.`);
+    } else if (normSkin.includes('fair') && (topColor.includes('navy') || topColor.includes('charcoal') || topColor.includes('forest') || topColor.includes('grey'))) {
+      score += 0.4;
+      notes.push(`Deep structured tone provides flattering definition for your Fair undertone.`);
+    }
   }
 
   return {
@@ -159,7 +186,11 @@ export function evaluateStyleCohesion(items: WardrobeItem[]): { score: number; n
 /**
  * 3. Calculate Fit & Proportion (0 to 10)
  */
-export function evaluateFitAndProportion(items: WardrobeItem[]): { score: number; notes: string[] } {
+export function evaluateFitAndProportion(
+  items: WardrobeItem[],
+  bodyBuild?: string,
+  preferredFit?: string
+): { score: number; notes: string[] } {
   const top = items.find((i) => i.category === 'tops');
   const bottom = items.find((i) => i.category === 'bottoms');
   const layer = items.find((i) => i.category === 'layers');
@@ -185,6 +216,17 @@ export function evaluateFitAndProportion(items: WardrobeItem[]): { score: number
     } else {
       score += 0.6;
       notes.push('Clean, streamlined tailored silhouette.');
+    }
+  }
+
+  if (bodyBuild) {
+    const normBuild = bodyBuild.toLowerCase();
+    if (normBuild === 'athletic') {
+      notes.push('Silhouette balances athletic proportions naturally.');
+    } else if (normBuild === 'broad') {
+      notes.push('Proportions create clean vertical alignment across the torso and legs.');
+    } else if (normBuild === 'slim') {
+      notes.push('Structured cut adds subtle presence and intentional drape.');
     }
   }
 
@@ -459,9 +501,9 @@ export async function evaluateSelfStyledLook(params: EvaluateLookParams): Promis
   }
 
   // Calculate categorical scores
-  const colorRes = evaluateColorHarmony(selectedItems);
+  const colorRes = evaluateColorHarmony(selectedItems, userProfile?.skin_tone);
   const styleRes = evaluateStyleCohesion(selectedItems);
-  const fitRes = evaluateFitAndProportion(selectedItems);
+  const fitRes = evaluateFitAndProportion(selectedItems, userProfile?.body_build, userProfile?.preferred_fit);
   const occasionRes = evaluateOccasionFit(selectedItems, occasion);
   const footRes = evaluateFootwearCompatibility(selectedItems);
   const accRes = evaluateAccessoryBalance(selectedItems);
@@ -527,11 +569,12 @@ You are AUREVÉ's master Indian luxury personal fashion critic.
 Analyze this user-styled outfit combination:
 Pieces: ${itemsDescription}
 Target Occasion: ${occasion || 'Casual / Social'}
+User Profile: Skin Undertone: ${userProfile?.skin_tone || 'Warm Neutral'}, Body Build: ${userProfile?.body_build || 'Proportional'}, Preferred Fit: ${userProfile?.preferred_fit || 'Regular'}
 Overall Score: ${overall_score}/10
 Verdict: "${verdict}"
 
 Provide two short editorial paragraphs:
-1. "what_works": 2-3 sentences explaining why this visual combination, colors, and proportions work well.
+1. "what_works": 2-3 sentences explaining why this visual combination, colors, and proportions work well (mentioning flattering harmony with their undertone or frame if relevant).
 2. "how_to_improve": 1-2 actionable sentences offering a constructive stylist tip (referencing clean contrast, layering, or footwear).
 
 Return strict JSON:

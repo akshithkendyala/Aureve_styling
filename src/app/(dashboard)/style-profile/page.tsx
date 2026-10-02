@@ -3,8 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile } from '@/lib/types';
 import { POPULAR_INDIAN_CITIES } from '@/lib/weather/weatherService';
-import { Sparkles, Check, User, Palette, Sliders, Phone, Mail, MapPin, Layers } from 'lucide-react';
+import { Sparkles, Check, User, Palette, Sliders, Phone, Mail, MapPin, Layers, Camera, RotateCcw } from 'lucide-react';
 import { normalizeMobileNumber, isValidIndianMobile, formatMobileDisplay } from '@/lib/auth/mobile';
+import SkinScanModal from '@/components/profile/SkinScanModal';
+import BodyScanModal from '@/components/profile/BodyScanModal';
 
 const POPULAR_COLORS = [
   'Navy Blue',
@@ -53,7 +55,10 @@ export default function StyleProfilePage() {
   const [age, setAge] = useState('');
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
+  const [bodyBuild, setBodyBuild] = useState('');
+  const [bodyScanConfidence, setBodyScanConfidence] = useState<number | undefined>(undefined);
   const [skinTone, setSkinTone] = useState('');
+  const [skinScanConfidence, setSkinScanConfidence] = useState<number | undefined>(undefined);
   const [preferredFit, setPreferredFit] = useState('');
   const [favoriteColors, setFavoriteColors] = useState<string[]>([]);
   const [avoidedColors, setAvoidedColors] = useState<string[]>([]);
@@ -61,6 +66,10 @@ export default function StyleProfilePage() {
   const [comfortPreference, setComfortPreference] = useState('');
   const [typicalOccasions, setTypicalOccasions] = useState<string[]>([]);
   const [city, setCity] = useState('');
+
+  // Scanner Modal States
+  const [isSkinScanModalOpen, setIsSkinScanModalOpen] = useState(false);
+  const [isBodyScanModalOpen, setIsBodyScanModalOpen] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -85,7 +94,10 @@ export default function StyleProfilePage() {
             }
             if (p.height) setHeight(p.height);
             if (p.weight) setWeight(p.weight);
+            if (p.body_build) setBodyBuild(p.body_build);
+            if (p.body_scan_confidence !== undefined) setBodyScanConfidence(p.body_scan_confidence);
             if (p.skin_tone) setSkinTone(p.skin_tone);
+            if (p.skin_scan_confidence !== undefined) setSkinScanConfidence(p.skin_scan_confidence);
             if (p.preferred_fit) setPreferredFit(p.preferred_fit);
             if (p.favorite_colors && Array.isArray(p.favorite_colors)) setFavoriteColors(p.favorite_colors);
             if (p.avoided_colors && Array.isArray(p.avoided_colors)) setAvoidedColors(p.avoided_colors);
@@ -174,7 +186,10 @@ export default function StyleProfilePage() {
           age: parsedAge,
           height,
           weight,
+          body_build: bodyBuild,
+          body_scan_confidence: bodyScanConfidence,
           skin_tone: skinTone,
+          skin_scan_confidence: skinScanConfidence,
           preferred_fit: preferredFit,
           favorite_colors: favoriteColors,
           avoided_colors: avoidedColors,
@@ -315,7 +330,7 @@ export default function StyleProfilePage() {
         </div>
 
         {/* 2. Proportions & Silhouette */}
-        <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-5">
+        <div className="bg-white rounded-3xl border border-[#EBE5DB] p-6 sm:p-8 space-y-6">
           <div className="flex items-center space-x-2 pb-3 border-b border-[#F4EFEA]">
             <Layers className="w-4 h-4 text-[#9A7B5F]" />
             <h3 className="font-serif text-xl font-semibold text-[#18181B]">
@@ -323,7 +338,132 @@ export default function StyleProfilePage() {
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* A. Skin Undertone Section */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B]">
+                  Skin Undertone (Color Harmony)
+                </label>
+                <p className="text-[11px] text-[#7E6047]">
+                  Calibrates contrast & palette recommendations for shirts, layering & accessories.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {skinScanConfidence !== undefined && skinScanConfidence > 0 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <Sparkles className="w-2.5 h-2.5 mr-1" />
+                    AI Calibrated ({Math.round(skinScanConfidence * 100)}%)
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsSkinScanModalOpen(true)}
+                  className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-[#18181B] text-[#FAF8F5] hover:bg-[#3D2E22] transition-colors shadow-xs"
+                >
+                  <Camera className="w-3.5 h-3.5 mr-1.5" />
+                  {skinTone ? 'Scan Again' : 'Scan Face'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              {[
+                { name: 'Warm Olive', desc: 'Golden / yellow undertones', preview: 'bg-[#D2A679]' },
+                { name: 'Medium Wheatish', desc: 'Neutral warm undertones', preview: 'bg-[#C89D7C]' },
+                { name: 'Dusky', desc: 'Rich brown undertones', preview: 'bg-[#A77654]' },
+                { name: 'Deep Tan', desc: 'Deep warm undertones', preview: 'bg-[#7C4F35]' },
+                { name: 'Fair', desc: 'Cool / neutral fair undertones', preview: 'bg-[#F2D7C5]' },
+              ].map((tone) => {
+                const isSelected = skinTone === tone.name;
+                return (
+                  <button
+                    key={tone.name}
+                    type="button"
+                    onClick={() => {
+                      setSkinTone(tone.name);
+                    }}
+                    className={`p-3 rounded-2xl border text-left transition-all relative ${
+                      isSelected
+                        ? 'border-[#18181B] bg-[#18181B] text-white shadow-xs'
+                        : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className={`w-3.5 h-3.5 rounded-full border border-black/10 flex-shrink-0 ${tone.preview}`} />
+                      <span className="text-xs font-semibold leading-tight line-clamp-1">{tone.name}</span>
+                    </div>
+                    <span className={`text-[10px] leading-tight block ${isSelected ? 'text-[#FAF8F5]/80' : 'text-[#7E6047]'}`}>
+                      {tone.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* B. Body Build / Silhouette Section */}
+          <div className="space-y-3 pt-3 border-t border-[#F4EFEA]">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B]">
+                  Body Build / Silhouette
+                </label>
+                <p className="text-[11px] text-[#7E6047]">
+                  Ensures balanced outfit proportions, neckline cuts, and trouser drape.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {bodyScanConfidence !== undefined && bodyScanConfidence > 0 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <Sparkles className="w-2.5 h-2.5 mr-1" />
+                    AI Calibrated ({Math.round(bodyScanConfidence * 100)}%)
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsBodyScanModalOpen(true)}
+                  className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-[#18181B] text-[#FAF8F5] hover:bg-[#3D2E22] transition-colors shadow-xs"
+                >
+                  <Camera className="w-3.5 h-3.5 mr-1.5" />
+                  {bodyBuild ? 'Scan Again' : 'Scan Body'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {[
+                { name: 'Slim', desc: 'Linear, streamlined frame' },
+                { name: 'Athletic', desc: 'V-taper, defined shoulders' },
+                { name: 'Medium', desc: 'Even, proportional frame' },
+                { name: 'Broad', desc: 'Wide shoulders & sturdy chest' },
+              ].map((build) => {
+                const isSelected = bodyBuild === build.name;
+                return (
+                  <button
+                    key={build.name}
+                    type="button"
+                    onClick={() => {
+                      setBodyBuild(build.name);
+                    }}
+                    className={`p-3 rounded-2xl border text-left transition-all ${
+                      isSelected
+                        ? 'border-[#18181B] bg-[#18181B] text-white shadow-xs'
+                        : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#18181B]'
+                    }`}
+                  >
+                    <div className="text-xs font-semibold mb-0.5">{build.name}</div>
+                    <span className={`text-[10px] leading-tight block ${isSelected ? 'text-[#FAF8F5]/80' : 'text-[#7E6047]'}`}>
+                      {build.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* C, D, E. Height, Weight, Fit, City */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-3 border-t border-[#F4EFEA]">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
                 Height
@@ -339,37 +479,17 @@ export default function StyleProfilePage() {
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
-                Build / Weight
+                Weight
               </label>
               <input
                 type="text"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
-                placeholder="72 kg, Athletic, Medium"
+                placeholder="70 kg or 155 lbs"
                 className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
-                Skin Undertone
-              </label>
-              <select
-                value={skinTone}
-                onChange={(e) => setSkinTone(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
-              >
-                <option value="">Select skin undertone</option>
-                <option value="Fair">Fair</option>
-                <option value="Warm Olive">Warm Olive</option>
-                <option value="Medium Wheatish">Medium Wheatish</option>
-                <option value="Dusky">Dusky</option>
-                <option value="Deep Tan">Deep Tan</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[#7E6047] mb-1.5">
                 Preferred Fit
@@ -578,6 +698,27 @@ export default function StyleProfilePage() {
           </button>
         </div>
       </form>
+
+      {/* AI Modals */}
+      <SkinScanModal
+        isOpen={isSkinScanModalOpen}
+        onClose={() => setIsSkinScanModalOpen(false)}
+        currentUndertone={skinTone}
+        onApplyResult={(detectedTone, confidence) => {
+          setSkinTone(detectedTone);
+          setSkinScanConfidence(confidence);
+        }}
+      />
+
+      <BodyScanModal
+        isOpen={isBodyScanModalOpen}
+        onClose={() => setIsBodyScanModalOpen(false)}
+        currentBuild={bodyBuild}
+        onApplyResult={(detectedBuild, confidence) => {
+          setBodyBuild(detectedBuild);
+          setBodyScanConfidence(confidence);
+        }}
+      />
     </div>
   );
 }
