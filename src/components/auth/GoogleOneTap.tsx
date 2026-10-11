@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Script from 'next/script';
 import { createClient } from '@/lib/supabase/client';
 
@@ -125,7 +125,7 @@ export function GoogleOneTap({ onSuccess, onError }: GoogleOneTapProps) {
     }
   };
 
-  const initOneTap = () => {
+  const initOneTap = useCallback(() => {
     if (!googleClientId || isInitializedRef.current) return;
     if (typeof window === 'undefined' || !window.google?.accounts?.id) return;
 
@@ -155,13 +155,13 @@ export function GoogleOneTap({ onSuccess, onError }: GoogleOneTapProps) {
     } catch (e) {
       console.warn('Google One Tap init exception:', e);
     }
-  };
+  }, [googleClientId]);
 
   useEffect(() => {
     if (scriptLoaded) {
       initOneTap();
     }
-  }, [scriptLoaded]);
+  }, [scriptLoaded, initOneTap]);
 
   return (
     <>
