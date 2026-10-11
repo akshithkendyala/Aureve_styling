@@ -165,18 +165,26 @@ function StyleYourselfContent() {
     setIsSaved(false);
   };
 
+  const isOnePieceItem = (item: WardrobeItem | null) => {
+    if (!item) return false;
+    const sub = (item.subcategory || '').toLowerCase();
+    const name = (item.name || '').toLowerCase();
+    const onePieces = ['dress', 'saree', 'jumpsuit', 'romper', 'anarkali', 'lehenga'];
+    return onePieces.some((op) => sub.includes(op) || name.includes(op));
+  };
+
   // Analyze the Self-Styled Look
   const handleAnalyzeLook = async () => {
     if (!selectedTop && !selectedBottom) {
-      setError('Please select at least a top and a bottom from your wardrobe.');
+      setError('Please select clothing pieces from your wardrobe.');
       return;
     }
     if (!selectedTop) {
-      setError('Please select a top piece.');
+      setError('Please select a top or one-piece outfit.');
       return;
     }
-    if (!selectedBottom) {
-      setError('Please select a bottom piece.');
+    if (!selectedBottom && !isOnePieceItem(selectedTop)) {
+      setError('Please select a bottom piece to complete your outfit.');
       return;
     }
 
@@ -287,7 +295,7 @@ function StyleYourselfContent() {
     }
   };
 
-  const isReadyToAnalyze = Boolean(selectedTop && selectedBottom);
+  const isReadyToAnalyze = Boolean((selectedTop && selectedBottom) || (selectedTop && isOnePieceItem(selectedTop)));
 
   return (
     <div className="space-y-8 sm:space-y-12 pb-16">
@@ -542,6 +550,11 @@ function StyleYourselfContent() {
                       <p className="text-xs font-semibold text-[#18181B] line-clamp-1">{selectedBottom.name}</p>
                       <p className="text-[10px] text-[#7E6047]">{selectedBottom.primary_color}</p>
                     </div>
+                  </div>
+                ) : isOnePieceItem(selectedTop) ? (
+                  <div className="my-auto py-2.5 text-center px-1 border border-dashed border-[#EBE5DB] rounded-xl bg-white/60">
+                    <p className="text-[11px] font-semibold text-[#18181B]">Standalone Outfit</p>
+                    <p className="text-[10px] text-[#7E6047]">Bottom piece optional</p>
                   </div>
                 ) : (
                   <button

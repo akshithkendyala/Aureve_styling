@@ -170,6 +170,7 @@ export const Repository = {
       name?: string;
       mobile_number?: string;
       age?: number;
+      gender?: string;
       avatar_url?: string;
       picture?: string;
     };
@@ -255,12 +256,15 @@ export const Repository = {
       }
     }
 
+    const gender = authUser.user_metadata?.gender || undefined;
+
     const user: User = {
       id: userId,
       email: authUser.email,
       name: resolvedName,
       mobile_number: resolvedMobile,
       age,
+      gender,
       avatar_url: avatarUrl,
       created_at: authUser.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -315,6 +319,7 @@ export const Repository = {
       const resolvedName = (userRecord?.name || authUserMeta?.name || authUserMeta?.full_name || 'Member').trim();
       const resolvedMobile = userRecord?.mobile_number || authUserMeta?.mobile_number || '';
       const resolvedAge = userRecord?.age ?? (authUserMeta?.age ? Number(authUserMeta.age) : undefined);
+      const resolvedGender = (profileData as any).gender || authUserMeta?.gender || undefined;
       const resolvedBuild = authUserMeta?.body_build || undefined;
       const resolvedSkinConf =
         authUserMeta?.skin_scan_confidence !== undefined ? Number(authUserMeta.skin_scan_confidence) : undefined;
@@ -329,6 +334,7 @@ export const Repository = {
         full_name: resolvedName,
         mobile_number: resolvedMobile,
         age: resolvedAge,
+        gender: resolvedGender,
         height: profileData.height || undefined,
         weight: profileData.weight || undefined,
         body_build: resolvedBuild,
@@ -359,6 +365,7 @@ export const Repository = {
         full_name: userRecord?.name || cached.full_name || '',
         mobile_number: userRecord?.mobile_number || cached.mobile_number || '',
         age: userRecord?.age || cached.age,
+        gender: cached.gender || authUserMeta?.gender || undefined,
       };
     }
 
@@ -403,6 +410,7 @@ export const Repository = {
       ''
     ).trim();
     const userAge = profileData.age !== undefined ? Number(profileData.age) : existing?.age;
+    const gender = profileData.gender !== undefined ? profileData.gender : existing?.gender;
     const bodyBuild = profileData.body_build !== undefined ? profileData.body_build : existing?.body_build;
     const skinScanConf =
       profileData.skin_scan_confidence !== undefined
@@ -421,6 +429,7 @@ export const Repository = {
       full_name: preferredName,
       mobile_number: cleanMobile,
       age: userAge,
+      gender: gender || undefined,
       height: profileData.height !== undefined ? profileData.height : existing?.height,
       weight: profileData.weight !== undefined ? profileData.weight : existing?.weight,
       body_build: bodyBuild,
@@ -472,13 +481,14 @@ export const Repository = {
 
         await supabaseAdmin.from('users').upsert(userUpdatePayload, { onConflict: 'id' });
 
-        // Update auth user metadata with full profile details (including body_build, age, scan confidence)
+        // Update auth user metadata with full profile details (including gender, body_build, age, scan confidence)
         await supabaseAdmin.auth.admin.updateUserById(userId, {
           user_metadata: {
             name: preferredName,
             full_name: preferredName,
             mobile_number: cleanMobile,
             age: userAge,
+            gender: gender || undefined,
             body_build: bodyBuild,
             body_scan_confidence: bodyScanConf,
             skin_scan_confidence: skinScanConf,
@@ -488,30 +498,45 @@ export const Repository = {
         console.warn('User metadata sync note:', userSyncErr);
       }
 
-      // 2. Update public.profiles with ONLY columns that exist on profiles table
+      // 2. Update public.profiles with valid columns
       try {
-        const { data, error } = await supabaseAdmin
+        const profilePayload: Record<string, any> = {
+          user_id: userId,
+          height: updated.height,
+          weight: updated.weight,
+          skin_tone: updated.skin_tone,
+          preferred_fit: updated.preferred_fit,
+          favorite_colors: updated.favorite_colors,
+          avoided_colors: updated.avoided_colors,
+          style_preferences: updated.style_preferences,
+          comfort_preference: updated.comfort_preference,
+          typical_occasions: updated.typical_occasions,
+          city: updated.city,
+          profile_completed: updated.profile_completed,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (gender) {
+          profilePayload.gender = gender;
+        }
+
+        let { data, error } = await supabaseAdmin
           .from('profiles')
-          .upsert(
-            {
-              user_id: userId,
-              height: updated.height,
-              weight: updated.weight,
-              skin_tone: updated.skin_tone,
-              preferred_fit: updated.preferred_fit,
-              favorite_colors: updated.favorite_colors,
-              avoided_colors: updated.avoided_colors,
-              style_preferences: updated.style_preferences,
-              comfort_preference: updated.comfort_preference,
-              typical_occasions: updated.typical_occasions,
-              city: updated.city,
-              profile_completed: updated.profile_completed,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'user_id' }
-          )
+          .upsert(profilePayload, { onConflict: 'user_id' })
           .select('*')
           .single();
+
+        // If gender column is not yet present on profiles table, retry without gender
+        if (error && error.message && error.message.includes('gender') && error.message.includes('does not exist')) {
+          delete profilePayload.gender;
+          const retryRes = await supabaseAdmin
+            .from('profiles')
+            .upsert(profilePayload, { onConflict: 'user_id' })
+            .select('*')
+            .single();
+          data = retryRes.data;
+          error = retryRes.error;
+        }
 
         if (error) {
           console.error('Supabase profiles.upsert error:', error);

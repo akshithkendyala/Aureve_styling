@@ -80,7 +80,7 @@ export function OutfitResultCard({
           {topItem && (
             <div className="garment-card bg-[#FBF9F6] rounded-2xl p-3 border border-[#EBE5DB] flex flex-col">
               <span className="text-[10px] font-bold uppercase tracking-widest text-[#7E6047] mb-1.5">
-                TOP
+                {!bottomItem || ['dress', 'saree', 'jumpsuit', 'romper', 'anarkali'].some((k) => (topItem.subcategory || '').toLowerCase().includes(k)) ? 'MAIN PIECE' : 'TOP'}
               </span>
               <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-white mb-2 shadow-xs">
                 <Image

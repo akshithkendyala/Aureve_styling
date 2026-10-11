@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { UserProfile } from '@/lib/types';
 import { POPULAR_INDIAN_CITIES } from '@/lib/weather/weatherService';
-import { Sparkles, Check, User, Palette, Sliders, Phone, Mail, MapPin, Layers, Camera, RotateCcw } from 'lucide-react';
+import { Sparkles, Check, User, Palette, Sliders, Phone, Mail, MapPin, Layers, Camera, RotateCcw, AlertCircle } from 'lucide-react';
 import { normalizeMobileNumber, isValidIndianMobile, formatMobileDisplay } from '@/lib/auth/mobile';
 import SkinScanModal from '@/components/profile/SkinScanModal';
 import BodyScanModal from '@/components/profile/BodyScanModal';
@@ -48,11 +49,13 @@ const POPULAR_OCCASIONS = [
 ];
 
 export default function StyleProfilePage() {
+  const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [age, setAge] = useState('');
+  const [gender, setGender] = useState('');
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
   const [bodyBuild, setBodyBuild] = useState('');
@@ -72,47 +75,56 @@ export default function StyleProfilePage() {
   const [isBodyScanModalOpen, setIsBodyScanModalOpen] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  useEffect(() => {
-    async function loadProfile() {
-      try {
-        const res = await fetch('/api/profile');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.profile) {
-            const p = data.profile;
-            setProfile(p);
-            if (p.name) setName(p.name);
-            if (p.email) setEmail(p.email);
-            if (p.age) setAge(String(p.age));
-            if (p.mobile_number) {
-              const rawDigits = p.mobile_number.replace(/\D/g, '');
-              setMobileNumber(rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits);
-            }
-            if (p.height) setHeight(p.height);
-            if (p.weight) setWeight(p.weight);
-            if (p.body_build) setBodyBuild(p.body_build);
-            if (p.body_scan_confidence !== undefined) setBodyScanConfidence(p.body_scan_confidence);
-            if (p.skin_tone) setSkinTone(p.skin_tone);
-            if (p.skin_scan_confidence !== undefined) setSkinScanConfidence(p.skin_scan_confidence);
-            if (p.preferred_fit) setPreferredFit(p.preferred_fit);
-            if (p.favorite_colors && Array.isArray(p.favorite_colors)) setFavoriteColors(p.favorite_colors);
-            if (p.avoided_colors && Array.isArray(p.avoided_colors)) setAvoidedColors(p.avoided_colors);
-            if (p.style_preferences && Array.isArray(p.style_preferences)) setStylePrefs(p.style_preferences);
-            if (p.comfort_preference) setComfortPreference(p.comfort_preference);
-            if (p.typical_occasions && Array.isArray(p.typical_occasions)) setTypicalOccasions(p.typical_occasions);
-            if (p.city) setCity(p.city);
+  const loadProfile = async () => {
+    setIsLoading(true);
+    setLoadError('');
+    try {
+      const res = await fetch('/api/profile');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.profile) {
+          const p = data.profile;
+          setProfile(p);
+          if (p.name) setName(p.name);
+          if (p.email) setEmail(p.email);
+          if (p.age) setAge(String(p.age));
+          if (p.gender) setGender(p.gender);
+          if (p.mobile_number) {
+            const rawDigits = p.mobile_number.replace(/\D/g, '');
+            setMobileNumber(rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits);
           }
+          if (p.height) setHeight(p.height);
+          if (p.weight) setWeight(p.weight);
+          if (p.body_build) setBodyBuild(p.body_build);
+          if (p.body_scan_confidence !== undefined) setBodyScanConfidence(p.body_scan_confidence);
+          if (p.skin_tone) setSkinTone(p.skin_tone);
+          if (p.skin_scan_confidence !== undefined) setSkinScanConfidence(p.skin_scan_confidence);
+          if (p.preferred_fit) setPreferredFit(p.preferred_fit);
+          if (p.favorite_colors && Array.isArray(p.favorite_colors)) setFavoriteColors(p.favorite_colors);
+          if (p.avoided_colors && Array.isArray(p.avoided_colors)) setAvoidedColors(p.avoided_colors);
+          if (p.style_preferences && Array.isArray(p.style_preferences)) setStylePrefs(p.style_preferences);
+          if (p.comfort_preference) setComfortPreference(p.comfort_preference);
+          if (p.typical_occasions && Array.isArray(p.typical_occasions)) setTypicalOccasions(p.typical_occasions);
+          if (p.city) setCity(p.city);
         }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
+      } else {
+        const errData = await res.json().catch(() => null);
+        setLoadError(errData?.error || 'Failed to load your profile. Please check your connection.');
       }
+    } catch (err: any) {
+      console.error('Error fetching style profile:', err);
+      setLoadError('A connection error occurred while loading your styling profile.');
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadProfile();
   }, []);
 
@@ -184,6 +196,7 @@ export default function StyleProfilePage() {
           full_name: name.trim(),
           mobile_number: mobileNumber ? normalizeMobileNumber(mobileNumber) : undefined,
           age: parsedAge,
+          gender: gender || undefined,
           height,
           weight,
           body_build: bodyBuild,
@@ -203,18 +216,64 @@ export default function StyleProfilePage() {
 
       if (res.ok) {
         setSavedSuccess(true);
-        setTimeout(() => setSavedSuccess(false), 3000);
+        // Confirmed database save: automatically redirect to dashboard
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 1200);
       } else {
-        const d = await res.json();
-        setSaveError(d.error || 'Failed to save profile');
+        const d = await res.json().catch(() => null);
+        setSaveError(d?.error || 'Failed to save styling profile. Please try again.');
+        setIsSaving(false);
       }
     } catch (e) {
-      console.error(e);
-      setSaveError('A connection error occurred while saving.');
+      console.error('Save profile error:', e);
+      setSaveError('A connection error occurred while saving your profile.');
+      setIsSaving(false);
     } finally {
       setIsSaving(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[500px] flex flex-col items-center justify-center space-y-4 max-w-4xl mx-auto">
+        <div className="w-10 h-10 border-2 border-[#18181B] border-t-transparent rounded-full animate-spin" />
+        <div className="text-center space-y-1">
+          <h3 className="font-serif text-xl font-semibold text-[#18181B]">
+            Loading Your Style Profile
+          </h3>
+          <p className="text-xs text-[#7E6047]">
+            Retrieving your saved measurements, palette, and styling preferences…
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-[400px] flex flex-col items-center justify-center space-y-4 max-w-md mx-auto text-center p-8 bg-white border border-[#EBE5DB] rounded-3xl shadow-sm">
+        <AlertCircle className="w-10 h-10 text-rose-500" />
+        <div className="space-y-1">
+          <h3 className="font-serif text-lg font-semibold text-[#18181B]">
+            Could Not Load Styling Profile
+          </h3>
+          <p className="text-xs text-[#7E6047]">{loadError}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setIsLoading(true);
+            setLoadError('');
+            loadProfile();
+          }}
+          className="px-6 py-2.5 bg-[#18181B] text-[#FAF8F5] rounded-full text-xs font-semibold tracking-wide hover:bg-[#3D2E22] transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 sm:space-y-8 max-w-4xl mx-auto">
@@ -233,8 +292,8 @@ export default function StyleProfilePage() {
 
       {savedSuccess && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 flex items-center space-x-2 animate-in fade-in duration-200">
-          <Check className="w-4 h-4 text-emerald-600" />
-          <span>Style profile updated! Your preferred name and recommendations are synchronized.</span>
+          <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+          <span>Style profile updated successfully! Redirecting to dashboard…</span>
         </div>
       )}
 
@@ -325,6 +384,64 @@ export default function StyleProfilePage() {
                 placeholder="e.g. 25"
                 className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B] mb-1.5">
+                Home City
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9A7B5F]" />
+                <select
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
+                >
+                  <option value="">Select home city</option>
+                  {POPULAR_INDIAN_CITIES.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name} ({c.state})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Gender Selection */}
+            <div className="sm:col-span-2 pt-2 border-t border-[#F4EFEA]">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B] mb-1.5">
+                Fashion Styling Persona / Gender (Optional)
+              </label>
+              <p className="text-[11px] text-[#7E6047] mb-2.5">
+                Helps AUREVÉ personalize silhouette cuts, ethnic wear, and accessory combinations to your preferences.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {[
+                  { value: 'Male', label: 'Men\'s Fashion', desc: 'Shirts, trousers, kurtas, blazers' },
+                  { value: 'Female', label: 'Women\'s Fashion', desc: 'Dresses, sarees, kurtis, palazzos' },
+                  { value: 'Non-binary / Other', label: 'Gender-Fluid', desc: 'All inclusive wardrobe styles' },
+                  { value: 'Prefer not to say', label: 'Prefer Not to Say', desc: 'Wardrobe-driven styling' },
+                ].map((g) => {
+                  const isSelected = gender === g.value;
+                  return (
+                    <button
+                      key={g.value}
+                      type="button"
+                      onClick={() => setGender(g.value)}
+                      className={`p-3 rounded-2xl border text-left transition-all ${
+                        isSelected
+                          ? 'border-[#18181B] bg-[#18181B] text-[#FAF8F5] shadow-sm'
+                          : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#9A7B5F]'
+                      }`}
+                    >
+                      <div className="text-xs font-semibold">{g.label}</div>
+                      <div className={`text-[10px] mt-0.5 ${isSelected ? 'text-[#D6C7B7]' : 'text-[#7E6047]'}`}>
+                        {g.desc}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -685,13 +802,16 @@ export default function StyleProfilePage() {
           <button
             type="submit"
             disabled={isSaving}
-            className="px-8 py-3.5 rounded-full bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] text-xs font-semibold tracking-wide uppercase transition-all shadow-md flex items-center space-x-2 disabled:opacity-50"
+            className="px-8 py-3.5 rounded-full bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] text-xs font-semibold tracking-wide uppercase transition-all shadow-md flex items-center space-x-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
             {isSaving ? (
-              <span>Saving Preferences…</span>
+              <div className="flex items-center space-x-2">
+                <div className="w-3.5 h-3.5 border-2 border-[#FAF8F5] border-t-transparent rounded-full animate-spin" />
+                <span>Saving...</span>
+              </div>
             ) : (
               <>
-                <span>Save Style Profile</span>
+                <span>Save Styling Profile</span>
                 <Sparkles className="w-4 h-4" />
               </>
             )}

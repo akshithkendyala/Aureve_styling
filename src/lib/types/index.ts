@@ -115,6 +115,7 @@ export interface User {
   name: string; // Preferred app name
   mobile_number?: string;
   age?: number;
+  gender?: 'Male' | 'Female' | 'Non-binary / Other' | 'Prefer not to say' | string;
   avatar_url?: string;
   created_at: string;
   updated_at?: string;
@@ -170,6 +171,7 @@ export interface UserProfile {
   full_name?: string;
   mobile_number?: string; // Required Indian mobile number (+91XXXXXXXXXX)
   age?: number; // Required user age
+  gender?: 'Male' | 'Female' | 'Non-binary / Other' | 'Prefer not to say' | string;
   height?: string; // e.g., "5'10\"" or "178 cm"
   weight?: string; // e.g., "72 kg" or "158 lb"
   body_build?: BodyBuildCategory | string;

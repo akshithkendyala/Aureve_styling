@@ -112,6 +112,7 @@ export default function OnboardingPage() {
   const [mobileNumber, setMobileNumber] = useState('');
   const [age, setAge] = useState('');
   const [city, setCity] = useState('');
+  const [gender, setGender] = useState('');
 
   // Step 2: Proportions & Measurements (Starts completely unselected)
   const [heightUnit, setHeightUnit] = useState<'ft' | 'cm'>('ft');
@@ -287,6 +288,7 @@ export default function OnboardingPage() {
               if (draft.mobileNumber) setMobileNumber(draft.mobileNumber);
               if (draft.age) setAge(String(draft.age));
               if (draft.city) setCity(draft.city);
+              if (draft.gender) setGender(draft.gender);
               if (draft.heightUnit) setHeightUnit(draft.heightUnit);
               if (draft.heightFeet) setHeightFeet(draft.heightFeet);
               if (draft.heightInches) setHeightInches(draft.heightInches);
@@ -340,6 +342,7 @@ export default function OnboardingPage() {
           mobileNumber,
           age,
           city,
+          gender,
           heightUnit,
           heightFeet,
           heightInches,
@@ -523,6 +526,7 @@ export default function OnboardingPage() {
           full_name: name.trim(),
           mobile_number: normalizeMobileNumber(mobileNumber),
           age: Number(age),
+          gender: gender || undefined,
           city,
           height: finalHeight,
           weight: finalWeight,
@@ -757,6 +761,45 @@ export default function OnboardingPage() {
               <p className="text-[10px] text-[#9A7B5F] mt-1">
                 Used strictly for weather-aware fabric and layering suggestions.
               </p>
+            </div>
+
+            {/* Gender / Styling Persona (Optional & Respectful) */}
+            <div className="pt-2 border-t border-[#F4EFEA]">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#18181B]">
+                  Fashion Persona / Gender <span className="text-[#9A7B5F] text-[10px] font-normal">(Optional)</span>
+                </label>
+                <span className="text-[10px] font-medium text-[#7E6047]">
+                  Personalizes categories & cuts
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {[
+                  { value: 'Male', label: 'Men\'s Fashion', desc: 'Shirts, trousers, kurtas, jackets' },
+                  { value: 'Female', label: 'Women\'s Fashion', desc: 'Dresses, sarees, kurtis, palazzos' },
+                  { value: 'Non-binary / Other', label: 'Gender-Fluid', desc: 'All aesthetics & silhouettes' },
+                  { value: 'Prefer not to say', label: 'Prefer Not to Say', desc: 'Wardrobe-driven styling' },
+                ].map((g) => {
+                  const isSelected = gender === g.value;
+                  return (
+                    <button
+                      key={g.value}
+                      type="button"
+                      onClick={() => setGender(g.value)}
+                      className={`p-3 rounded-2xl border text-left transition-all ${
+                        isSelected
+                          ? 'border-[#18181B] bg-[#18181B] text-[#FAF8F5] shadow-sm'
+                          : 'border-[#EBE5DB] bg-[#FAF8F5] text-[#18181B] hover:border-[#9A7B5F]'
+                      }`}
+                    >
+                      <div className="text-xs font-semibold">{g.label}</div>
+                      <div className={`text-[10px] mt-0.5 ${isSelected ? 'text-[#D6C7B7]' : 'text-[#7E6047]'}`}>
+                        {g.desc}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

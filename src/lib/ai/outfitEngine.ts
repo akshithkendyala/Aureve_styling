@@ -43,7 +43,7 @@ export interface GenerateOutfitParams {
 
 interface ScoredCombination {
   top: WardrobeItem;
-  bottom: WardrobeItem;
+  bottom?: WardrobeItem;
   footwear?: WardrobeItem;
   layer?: WardrobeItem;
   accessories: WardrobeItem[];
@@ -52,6 +52,18 @@ interface ScoredCombination {
   styleDirection: string[];
   title: string;
   explanation: string;
+}
+
+/**
+ * Helper to identify one-piece outfits (dresses, jumpsuits, sarees, anarkalis, rompers)
+ * which do not require a separate bottom piece.
+ */
+export function isOnePiece(item?: WardrobeItem): boolean {
+  if (!item) return false;
+  const sub = normalizeSubcategory(item.subcategory).toLowerCase();
+  const name = (item.name || '').toLowerCase();
+  const onePieceKeywords = ['dress', 'saree', 'jumpsuit', 'romper', 'anarkali', 'lehenga'];
+  return onePieceKeywords.some((op) => sub.includes(op) || name.includes(op));
 }
 
 /**
@@ -166,45 +178,53 @@ export function isItemPermittedForOccasion(
  */
 function evaluateColorHarmony(
   top: WardrobeItem,
-  bottom: WardrobeItem,
+  bottom?: WardrobeItem,
   footwear?: WardrobeItem,
   skinTone?: string
 ): number {
   const topColor = top.primary_color.toLowerCase();
-  const bottomColor = bottom.primary_color.toLowerCase();
+  const bottomColor = bottom ? bottom.primary_color.toLowerCase() : '';
   const footColor = footwear?.primary_color.toLowerCase() || '';
 
   let score = 16;
 
   const neutrals = ['black', 'white', 'off-white', 'charcoal grey', 'dark grey', 'light grey', 'beige / cream', 'camel / khaki', 'sand'];
   const isTopNeutral = neutrals.some((n) => topColor.includes(n));
-  const isBottomNeutral = neutrals.some((n) => bottomColor.includes(n));
+  const isBottomNeutral = bottomColor ? neutrals.some((n) => bottomColor.includes(n)) : true;
 
   // Anchor principle: At least one piece should be a grounding neutral
   if (isTopNeutral || isBottomNeutral) {
     score += 4;
   }
 
-  // High contrast classics (Light top + Dark bottom, or Dark top + Light bottom)
-  if (
-    (topColor.includes('white') || topColor.includes('sky blue') || topColor.includes('beige') || topColor.includes('sand')) &&
-    (bottomColor.includes('navy') || bottomColor.includes('black') || bottomColor.includes('charcoal'))
-  ) {
-    score += 5;
-  }
-
-  // Monochrome / tonal elegance (All black or navy on navy)
-  if (topColor.includes('black') && bottomColor.includes('black')) {
-    score += 4;
-  }
-
-  // Matching leather rules
-  if (footColor) {
-    if ((footColor.includes('brown') || footColor.includes('tan')) && bottomColor.includes('navy')) {
-      score += 2;
+  if (bottomColor) {
+    // High contrast classics (Light top + Dark bottom, or Dark top + Light bottom)
+    if (
+      (topColor.includes('white') || topColor.includes('sky blue') || topColor.includes('beige') || topColor.includes('sand')) &&
+      (bottomColor.includes('navy') || bottomColor.includes('black') || bottomColor.includes('charcoal'))
+    ) {
+      score += 5;
     }
-    if (footColor.includes('white') && (bottomColor.includes('blue') || bottomColor.includes('black') || bottomColor.includes('grey'))) {
-      score += 3; // Clean white sneakers
+
+    // Monochrome / tonal elegance (All black or navy on navy)
+    if (topColor.includes('black') && bottomColor.includes('black')) {
+      score += 4;
+    }
+
+    // Matching leather rules
+    if (footColor) {
+      if ((footColor.includes('brown') || footColor.includes('tan')) && bottomColor.includes('navy')) {
+        score += 2;
+      }
+      if (footColor.includes('white') && (bottomColor.includes('blue') || bottomColor.includes('black') || bottomColor.includes('grey'))) {
+        score += 3; // Clean white sneakers
+      }
+    }
+  } else {
+    // For one-piece garments (Dresses, Sarees, Jumpsuits), award standalone color harmony
+    score += 5;
+    if (footColor && (neutrals.some((n) => footColor.includes(n)) || footColor.includes('gold') || footColor.includes('silver') || footColor.includes('tan') || footColor.includes('nude'))) {
+      score += 3;
     }
   }
 
@@ -287,8 +307,8 @@ function evaluateColorHarmony(
 /**
  * Unique combination fingerprint for anti-repetition tracking
  */
-function getCombinationFingerprint(topId: string, bottomId: string, footwearId?: string, layerId?: string): string {
-  return `${topId}::${bottomId}::${footwearId || 'none'}::${layerId || 'none'}`;
+function getCombinationFingerprint(topId: string, bottomId?: string, footwearId?: string, layerId?: string): string {
+  return `${topId}::${bottomId || 'standalone'}::${footwearId || 'none'}::${layerId || 'none'}`;
 }
 
 /**
@@ -324,7 +344,13 @@ function generateRankedCandidates(
   const candidates: ScoredCombination[] = [];
 
   for (const top of tops) {
-    for (const bottom of bottoms) {
+    const isSinglePiece = isOnePiece(top);
+    // For one-piece garments, bottom can be undefined (or paired with bottoms if available)
+    const bottomCandidates: (WardrobeItem | undefined)[] = isSinglePiece
+      ? (bottoms.length > 0 ? [undefined, ...bottoms] : [undefined])
+      : bottoms;
+
+    for (const bottom of bottomCandidates) {
       const footwearCandidates = footwears.length > 0 ? footwears : [undefined];
 
       for (const footwear of footwearCandidates) {
@@ -339,29 +365,43 @@ function generateRankedCandidates(
         if (watch && rule.maxAccessories >= 1) matchedAccessories.push(watch);
 
         const belt = accessories.find((a) => normalizeSubcategory(a.subcategory) === 'Belt');
-        if (belt && rule.maxAccessories >= 2 && normalizeSubcategory(bottom.subcategory) !== 'Track Pants') {
+        if (belt && bottom && rule.maxAccessories >= 2 && normalizeSubcategory(bottom.subcategory) !== 'Track Pants') {
           matchedAccessories.push(belt);
         }
 
-        const fingerprint = getCombinationFingerprint(top.id, bottom.id, footwear?.id, layer?.id);
+        const handbag = accessories.find((a) => {
+          const sub = normalizeSubcategory(a.subcategory).toLowerCase();
+          return sub.includes('bag') || sub.includes('tote') || sub.includes('clutch');
+        });
+        if (handbag && rule.maxAccessories >= 2 && !matchedAccessories.includes(handbag)) {
+          matchedAccessories.push(handbag);
+        }
+
+        const fingerprint = getCombinationFingerprint(top.id, bottom?.id, footwear?.id, layer?.id);
 
         let score = 55; // Base score
 
         // 1. Occasion & Formality alignment (+25)
         const topFormality = top.formality || 'Smart Casual';
-        const bottomFormality = bottom.formality || 'Smart Casual';
         if (rule.formalityLevels.includes(topFormality as any)) score += 12;
-        if (rule.formalityLevels.includes(bottomFormality as any)) score += 13;
+
+        if (bottom) {
+          const bottomFormality = bottom.formality || 'Smart Casual';
+          if (rule.formalityLevels.includes(bottomFormality as any)) score += 13;
+        } else if (isSinglePiece) {
+          // One-piece already carries complete outfit silhouette
+          score += 13;
+        }
 
         // 1b. Preferred Occasion Subcategories (+35 max)
         const normTopSub = normalizeSubcategory(top.subcategory).toLowerCase();
-        const normBottomSub = normalizeSubcategory(bottom.subcategory).toLowerCase();
+        const normBottomSub = bottom ? normalizeSubcategory(bottom.subcategory).toLowerCase() : '';
         const normFootwearSub = footwear ? normalizeSubcategory(footwear.subcategory).toLowerCase() : '';
 
         if (rule.preferredTopSubcategories?.some((pts) => pts.toLowerCase() === normTopSub)) {
           score += 15;
         }
-        if (rule.preferredBottomSubcategories?.some((pbs) => pbs.toLowerCase() === normBottomSub)) {
+        if (bottom && rule.preferredBottomSubcategories?.some((pbs) => pbs.toLowerCase() === normBottomSub)) {
           score += 10;
         }
         if (footwear && rule.preferredFootwearSubcategories?.some((pfs) => pfs.toLowerCase() === normFootwearSub)) {
@@ -375,9 +415,11 @@ function generateRankedCandidates(
         if (userProfile?.body_build) {
           const build = userProfile.body_build.toLowerCase();
           const topFit = (top.fit || 'Regular').toLowerCase();
-          const bottomFit = (bottom.fit || 'Regular').toLowerCase();
+          const bottomFit = (bottom?.fit || 'Regular').toLowerCase();
 
-          if (build === 'broad') {
+          if (isSinglePiece) {
+            score += 5; // One-piece silhouettes naturally create fluid, balanced vertical lines
+          } else if (build === 'broad') {
             // Broad frames benefit from structured regular tops and straight/relaxed bottoms
             if (topFit === 'regular' || topFit === 'relaxed') score += 3;
             if (bottomFit === 'regular' || bottomFit === 'relaxed' || bottomFit === 'wide') score += 3;
@@ -398,7 +440,7 @@ function generateRankedCandidates(
         // 3b. Preferred Fit alignment (+4)
         if (userProfile?.preferred_fit) {
           const pref = userProfile.preferred_fit.toLowerCase();
-          if ((top.fit || '').toLowerCase().includes(pref) || (bottom.fit || '').toLowerCase().includes(pref)) {
+          if ((top.fit || '').toLowerCase().includes(pref) || (bottom?.fit || '').toLowerCase().includes(pref)) {
             score += 4;
           }
         }
@@ -411,7 +453,7 @@ function generateRankedCandidates(
           if (layer) score += 8;
         }
 
-        if (isRain) {
+        if (isRain && bottom) {
           if ((bottom.primary_color || '').toLowerCase().includes('white')) score -= 15;
         }
 
@@ -422,12 +464,12 @@ function generateRankedCandidates(
 
         // 6. User Profile static preferences (+5 / -20)
         if (userProfile?.favorite_colors) {
-          if (userProfile.favorite_colors.some((fc) => top.primary_color.toLowerCase().includes(fc.toLowerCase()) || bottom.primary_color.toLowerCase().includes(fc.toLowerCase()))) {
+          if (userProfile.favorite_colors.some((fc) => top.primary_color.toLowerCase().includes(fc.toLowerCase()) || (bottom && bottom.primary_color.toLowerCase().includes(fc.toLowerCase())))) {
             score += 4;
           }
         }
         if (userProfile?.avoided_colors) {
-          if (userProfile.avoided_colors.some((ac) => top.primary_color.toLowerCase().includes(ac.toLowerCase()) || bottom.primary_color.toLowerCase().includes(ac.toLowerCase()))) {
+          if (userProfile.avoided_colors.some((ac) => top.primary_color.toLowerCase().includes(ac.toLowerCase()) || (bottom && bottom.primary_color.toLowerCase().includes(ac.toLowerCase())))) {
             score -= 20;
           }
         }
@@ -467,7 +509,7 @@ function generateRankedCandidates(
   return candidates.sort((a, b) => b.score - a.score);
 }
 
-function getStyleDirection(rule: OccasionRule, top: WardrobeItem, bottom: WardrobeItem): string[] {
+function getStyleDirection(rule: OccasionRule, top: WardrobeItem, bottom?: WardrobeItem): string[] {
   if (rule.key === 'interview') return ['Professional', 'Crisp', 'Executive'];
   if (rule.key === 'party') return ['Modern', 'Classy', 'Night Out'];
   if (rule.key === 'wedding' || rule.key === 'festival') return ['Heritage', 'Celebratory', 'Contemporary Indian'];
@@ -479,7 +521,16 @@ function getStyleDirection(rule: OccasionRule, top: WardrobeItem, bottom: Wardro
   return ['Simple', 'Classy', 'Modern'];
 }
 
-function generateSmartTitle(occasionKey: string, top: WardrobeItem, bottom: WardrobeItem): string {
+function generateSmartTitle(occasionKey: string, top: WardrobeItem, bottom?: WardrobeItem): string {
+  if (isOnePiece(top)) {
+    const sub = normalizeSubcategory(top.subcategory);
+    if (occasionKey === 'wedding' || occasionKey === 'festival') return `Festive Heritage ${sub} Ensemble`;
+    if (occasionKey === 'party') return `Modern Evening ${sub} Edit`;
+    if (occasionKey === 'office') return `Refined Workday ${sub}`;
+    if (occasionKey === 'date' || occasionKey === 'dinner') return `Effortless Evening ${sub}`;
+    return `Elevated ${sub} Silhouette`;
+  }
+
   if (occasionKey === 'interview') return 'Polished Executive Presence';
   if (occasionKey === 'party') return 'Modern Night-Out Styling';
   if (occasionKey === 'office') return 'Sharp Workday Minimalist';
@@ -496,7 +547,7 @@ function generateSmartTitle(occasionKey: string, top: WardrobeItem, bottom: Ward
 
 function generateSmartExplanation(
   top: WardrobeItem,
-  bottom: WardrobeItem,
+  bottom: WardrobeItem | undefined,
   footwear: WardrobeItem | undefined,
   layer: WardrobeItem | undefined,
   rule: OccasionRule,
@@ -504,7 +555,7 @@ function generateSmartExplanation(
   personalReasons: string[] = []
 ): string {
   const topName = top.name;
-  const bottomName = bottom.name;
+  const bottomName = bottom?.name || '';
   const footwearStr = footwear ? ` anchored with ${footwear.name.toLowerCase()}` : '';
   const layerStr = layer ? ` structured with the ${layer.name.toLowerCase()}` : '';
   const weatherStr = weather
@@ -512,6 +563,10 @@ function generateSmartExplanation(
     : '';
   const personalStr =
     personalReasons.length > 0 ? ` Reflecting your personal style preferences, this look ${personalReasons.join(' and ')}.` : '';
+
+  if (!bottom) {
+    return `The ${topName}${layerStr}${footwearStr} creates an effortless, poised standalone silhouette perfectly suited for ${rule.name}.${personalStr}${weatherStr}`;
+  }
 
   if (rule.key === 'interview') {
     return `For your interview, the ${topName} paired with ${bottomName}${footwearStr} creates a crisp, boardroom-ready presence with zero casual distractions.${personalStr}${weatherStr}`;
@@ -536,7 +591,7 @@ export function evaluateMissingItem(
   wardrobe: WardrobeItem[],
   occasionKey: string,
   chosenTop: WardrobeItem,
-  chosenBottom: WardrobeItem
+  chosenBottom?: WardrobeItem
 ): MissingItemSuggestion | null {
   const activeItems = wardrobe.filter((i) => !i.is_archived);
 
@@ -574,7 +629,7 @@ export function evaluateMissingItem(
         suggested_item: 'Deep Navy or Black Textured Party Shirt',
         reason:
           'Your wardrobe has good casual pieces, but a versatile party shirt would give you a more polished, evening-ready option for clubs and gatherings.',
-        why_it_works: `Pairs seamlessly with your ${chosenBottom.name} and clean sneakers for an instant evening upgrade.`,
+        why_it_works: `Pairs seamlessly with your ${chosenBottom ? chosenBottom.name : 'evening accessories'} and clean footwear for an instant upgrade.`,
         category: 'tops',
         priority: 'recommended',
       };
@@ -589,7 +644,7 @@ export function evaluateMissingItem(
         suggested_item: 'Classic Black or Dark Brown Leather Oxfords',
         reason:
           'You have the tailored formal shirt and trousers. A pair of classic leather formal shoes is essential to establish executive polish.',
-        why_it_works: 'Anchors your formal trousers with boardroom-level credibility.',
+        why_it_works: 'Anchors your formal attire with boardroom-level credibility.',
         category: 'footwear',
         priority: 'essential',
       };
@@ -601,7 +656,7 @@ export function evaluateMissingItem(
         title: 'Polishing the Executive Presence',
         suggested_item: 'Matching Leather Dress Belt',
         reason: 'A clean leather belt aligned with your formal shoe tone anchors formal trousers cleanly.',
-        why_it_works: 'Creates a clean visual line between your shirt and trousers.',
+        why_it_works: 'Creates a clean visual line across your tailored silhouette.',
         category: 'accessories',
         priority: 'recommended',
       };
@@ -707,7 +762,8 @@ export async function generateIntelligentOutfit(
     );
   }
 
-  if (validTops.length === 0 || validBottoms.length === 0) {
+  const hasOnePieceTops = validTops.some(isOnePiece);
+  if (validTops.length === 0 || (validBottoms.length === 0 && !hasOnePieceTops)) {
     throw new Error(`Your wardrobe does not contain appropriate clothing pieces for ${rule.name}. Please add appropriate pieces to your wardrobe.`);
   }
 
@@ -771,15 +827,15 @@ Footwear:
 ${footwearOptionsForPrompt.map((f) => `- ID: "${f.id}" | Name: "${f.name}" | Color: ${f.primary_color} | Subcategory: ${f.subcategory}`).join('\n')}
 
 MANDATORY INSTRUCTIONS:
-1. Select the most elegant, occasion-appropriate Top ID, Bottom ID, and Footwear ID from the lists above.
+1. Select the most elegant, occasion-appropriate Top ID, Bottom ID (or null if the Top is a one-piece outfit like Dress, Saree, Jumpsuit, Anarkali), and Footwear ID from the lists above.
 2. Consider the user's skin undertone (${userProfile?.skin_tone || 'Warm Neutral'}) for color contrast near the face, and body build (${userProfile?.body_build || 'Proportional'}) for balanced visual silhouette proportions.
-3. For PARTY, select stylish modern shirts / overshirts with clean jeans/chinos and sneakers/boots. NEVER select Kurta or Sandals.
-4. For INTERVIEW, select formal shirts, formal trousers, and formal shoes. NEVER select sneakers or t-shirts.
+3. For PARTY, select stylish modern tops/dresses/shirts with clean jeans/chinos/skirts and sleek footwear. NEVER select informal Kurta or Sandals.
+4. For INTERVIEW, select formal shirts/blouses, tailored trousers/skirts, and formal shoes. NEVER select sneakers or t-shirts.
 5. Return STRICT JSON:
 {
   "title": "Editorial title (e.g., Modern Night-Out Styling)",
   "selected_top_id": "EXACT_ID_FROM_TOPS",
-  "selected_bottom_id": "EXACT_ID_FROM_BOTTOMS",
+  "selected_bottom_id": "EXACT_ID_FROM_BOTTOMS_OR_NULL",
   "selected_footwear_id": "EXACT_ID_FROM_FOOTWEAR",
   "style_direction": ["Modern", "Classy", "Confident"],
   "ai_explanation": "2 concise sentences explaining why this exact combination works beautifully for this real-world occasion and flatters the user's undertone/proportions."
@@ -821,16 +877,15 @@ MANDATORY INSTRUCTIONS:
               const chosenFootwear = validFootwear.find((f) => f.id === parsed.selected_footwear_id);
 
               // Hard Post-Validation: Ensure AI did NOT violate occasion rules
-              if (
-                chosenTop &&
-                chosenBottom &&
-                isItemPermittedForOccasion(chosenTop, 'tops', rule) &&
-                isItemPermittedForOccasion(chosenBottom, 'bottoms', rule)
-              ) {
+              const isValidTop = chosenTop && isItemPermittedForOccasion(chosenTop, 'tops', rule);
+              const isOnePieceOutfit = chosenTop && isOnePiece(chosenTop);
+              const isValidBottom = chosenBottom ? isItemPermittedForOccasion(chosenBottom, 'bottoms', rule) : isOnePieceOutfit;
+
+              if (isValidTop && isValidBottom) {
                 finalLook = {
                   ...topCandidate,
                   top: chosenTop,
-                  bottom: chosenBottom,
+                  bottom: chosenBottom || (isOnePieceOutfit ? undefined : topCandidate.bottom),
                   footwear: chosenFootwear || topCandidate.footwear,
                   title: parsed.title || topCandidate.title,
                   explanation: parsed.ai_explanation || topCandidate.explanation,
@@ -855,8 +910,10 @@ MANDATORY INSTRUCTIONS:
   // Step 6: Construct Main Look Items
   const items: OutfitItemReference[] = [
     { wardrobe_item_id: finalLook.top.id, role: 'top', item: finalLook.top },
-    { wardrobe_item_id: finalLook.bottom.id, role: 'bottom', item: finalLook.bottom },
   ];
+  if (finalLook.bottom) {
+    items.push({ wardrobe_item_id: finalLook.bottom.id, role: 'bottom', item: finalLook.bottom });
+  }
   if (finalLook.footwear) {
     items.push({ wardrobe_item_id: finalLook.footwear.id, role: 'footwear', item: finalLook.footwear });
   }
@@ -916,14 +973,16 @@ function buildOccasionCompliantAlternatives(
   const alt1Candidate = rankedCandidates.find(
     (c) =>
       c.top.id !== primaryLook.top.id ||
-      c.bottom.id !== primaryLook.bottom.id
+      c.bottom?.id !== primaryLook.bottom?.id
   );
 
   if (alt1Candidate) {
     const alt1Items: OutfitItemReference[] = [
       { wardrobe_item_id: alt1Candidate.top.id, role: 'top', item: alt1Candidate.top },
-      { wardrobe_item_id: alt1Candidate.bottom.id, role: 'bottom', item: alt1Candidate.bottom },
     ];
+    if (alt1Candidate.bottom) {
+      alt1Items.push({ wardrobe_item_id: alt1Candidate.bottom.id, role: 'bottom', item: alt1Candidate.bottom });
+    }
     if (alt1Candidate.footwear) {
       alt1Items.push({ wardrobe_item_id: alt1Candidate.footwear.id, role: 'footwear', item: alt1Candidate.footwear });
     }
@@ -931,10 +990,11 @@ function buildOccasionCompliantAlternatives(
       alt1Items.push({ wardrobe_item_id: alt1Candidate.layer.id, role: 'layer', item: alt1Candidate.layer });
     }
 
+    const pairDesc = alt1Candidate.bottom ? `with ${alt1Candidate.bottom.name}` : `as a standout silhouette`;
     alternatives.push({
       title: rule.key === 'interview' ? 'Look 02 — Classic Formal Alternative' : 'Look 02 — Subtle Shift',
       badge: rule.key === 'interview' ? 'Formal' : 'Refined',
-      description: `Rotate into the ${alt1Candidate.top.name} with ${alt1Candidate.bottom.name} for a distinctive, equally polished aesthetic.`,
+      description: `Rotate into the ${alt1Candidate.top.name} ${pairDesc} for a distinctive, equally polished aesthetic.`,
       items: alt1Items,
     });
   }
@@ -944,14 +1004,16 @@ function buildOccasionCompliantAlternatives(
     (c) =>
       c.top.id !== primaryLook.top.id &&
       (alt1Candidate ? c.top.id !== alt1Candidate.top.id : true) &&
-      (alt1Candidate ? c.bottom.id !== alt1Candidate.bottom.id : true)
+      (alt1Candidate ? c.bottom?.id !== alt1Candidate.bottom?.id : true)
   ) || rankedCandidates.find((c) => c.fingerprint !== primaryLook.fingerprint && (alt1Candidate ? c.fingerprint !== alt1Candidate.fingerprint : true));
 
   if (alt2Candidate) {
     const alt2Items: OutfitItemReference[] = [
       { wardrobe_item_id: alt2Candidate.top.id, role: 'top', item: alt2Candidate.top },
-      { wardrobe_item_id: alt2Candidate.bottom.id, role: 'bottom', item: alt2Candidate.bottom },
     ];
+    if (alt2Candidate.bottom) {
+      alt2Items.push({ wardrobe_item_id: alt2Candidate.bottom.id, role: 'bottom', item: alt2Candidate.bottom });
+    }
     if (alt2Candidate.footwear) {
       alt2Items.push({ wardrobe_item_id: alt2Candidate.footwear.id, role: 'footwear', item: alt2Candidate.footwear });
     }
@@ -959,10 +1021,11 @@ function buildOccasionCompliantAlternatives(
       alt2Items.push({ wardrobe_item_id: alt2Candidate.layer.id, role: 'layer', item: alt2Candidate.layer });
     }
 
+    const pairDesc2 = alt2Candidate.bottom ? `against ${alt2Candidate.bottom.name}` : `in a refined standalone silhouette`;
     alternatives.push({
       title: rule.key === 'interview' ? 'Look 03 — Tailored Contrast' : 'Look 03 — Structured Presence',
       badge: 'Tailored',
-      description: `Pairing the ${alt2Candidate.top.name} against ${alt2Candidate.bottom.name} provides clean tonal definition while remaining 100% occasion-compliant.`,
+      description: `Pairing the ${alt2Candidate.top.name} ${pairDesc2} provides clean tonal definition while remaining 100% occasion-compliant.`,
       items: alt2Items,
     });
   }

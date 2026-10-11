@@ -332,7 +332,7 @@ export function buildLearnedStyleProfile(
 export function calculateFeedbackScore(
   candidate: {
     top: WardrobeItem;
-    bottom: WardrobeItem;
+    bottom?: WardrobeItem;
     footwear?: WardrobeItem;
     layer?: WardrobeItem;
     accessories?: WardrobeItem[];
@@ -358,12 +358,14 @@ export function calculateFeedbackScore(
     }
   }
 
-  const bottomStats = profile.itemStats[candidate.bottom.id];
-  if (bottomStats && bottomStats.ratings.length >= 2) {
-    if (bottomStats.averageRating >= 4.3) {
-      feedbackScore += 7;
-    } else if (bottomStats.averageRating <= 2.3) {
-      feedbackScore -= 9;
+  if (candidate.bottom) {
+    const bottomStats = profile.itemStats[candidate.bottom.id];
+    if (bottomStats && bottomStats.ratings.length >= 2) {
+      if (bottomStats.averageRating >= 4.3) {
+        feedbackScore += 7;
+      } else if (bottomStats.averageRating <= 2.3) {
+        feedbackScore -= 9;
+      }
     }
   }
 
@@ -380,7 +382,7 @@ export function calculateFeedbackScore(
 
   // 2. Learned Fit Affinity (+/- 10 max)
   const topFit = (candidate.top.fit || '').trim().toLowerCase();
-  const bottomFit = (candidate.bottom.fit || '').trim().toLowerCase();
+  const bottomFit = (candidate.bottom?.fit || '').trim().toLowerCase();
 
   const learnedTopFit = profile.fitPreferences[topFit];
   if (learnedTopFit && learnedTopFit.confidence >= 0.3) {
@@ -391,15 +393,17 @@ export function calculateFeedbackScore(
     }
   }
 
-  const learnedBottomFit = profile.fitPreferences[bottomFit];
-  if (learnedBottomFit && learnedBottomFit.confidence >= 0.3) {
-    const delta = Math.round(learnedBottomFit.recencyWeightedScore * learnedBottomFit.confidence * 6);
-    feedbackScore += delta;
+  if (bottomFit) {
+    const learnedBottomFit = profile.fitPreferences[bottomFit];
+    if (learnedBottomFit && learnedBottomFit.confidence >= 0.3) {
+      const delta = Math.round(learnedBottomFit.recencyWeightedScore * learnedBottomFit.confidence * 6);
+      feedbackScore += delta;
+    }
   }
 
   // 3. Learned Color Affinity (+/- 10 max)
   const topColor = candidate.top.primary_color.trim().toLowerCase();
-  const bottomColor = candidate.bottom.primary_color.trim().toLowerCase();
+  const bottomColor = candidate.bottom ? candidate.bottom.primary_color.trim().toLowerCase() : '';
 
   const learnedTopColor = profile.colorPreferences[topColor];
   if (learnedTopColor && learnedTopColor.confidence >= 0.3) {
@@ -410,10 +414,12 @@ export function calculateFeedbackScore(
     }
   }
 
-  const learnedBottomColor = profile.colorPreferences[bottomColor];
-  if (learnedBottomColor && learnedBottomColor.confidence >= 0.3) {
-    const delta = Math.round(learnedBottomColor.recencyWeightedScore * learnedBottomColor.confidence * 5);
-    feedbackScore += delta;
+  if (bottomColor) {
+    const learnedBottomColor = profile.colorPreferences[bottomColor];
+    if (learnedBottomColor && learnedBottomColor.confidence >= 0.3) {
+      const delta = Math.round(learnedBottomColor.recencyWeightedScore * learnedBottomColor.confidence * 5);
+      feedbackScore += delta;
+    }
   }
 
   // 4. Learned Footwear Affinity (+/- 8 max)
@@ -442,7 +448,7 @@ export function calculateFeedbackScore(
   }
 
   // 6. Combination Rating Penalty / Boost (+/- 12 max)
-  const comboKey = `${candidate.top.id}::${candidate.bottom.id}::${candidate.footwear?.id || 'none'}`;
+  const comboKey = `${candidate.top.id}::${candidate.bottom?.id || 'standalone'}::${candidate.footwear?.id || 'none'}`;
   const comboRecord = profile.combinationScores[comboKey];
   if (comboRecord && comboRecord.evidence >= 1) {
     if (comboRecord.score > 0.4) {

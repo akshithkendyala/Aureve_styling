@@ -53,6 +53,17 @@ export async function PUT(req: NextRequest) {
       updates.age = parsedAge;
     }
 
+    // Check gender validation if supplied
+    if (updates.gender !== undefined && updates.gender !== null && updates.gender !== '') {
+      const allowedGenders = ['Male', 'Female', 'Non-binary / Other', 'Prefer not to say'];
+      if (!allowedGenders.includes(updates.gender)) {
+        return NextResponse.json(
+          { error: 'Please select a valid gender option.' },
+          { status: 400 }
+        );
+      }
+    }
+
     // If attempting to complete profile, enforce required fields (Name, Mobile, Age)
     if (updates.profile_completed === true) {
       const existingProfile = await Repository.getUserProfile(session.userId);

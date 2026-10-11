@@ -24,6 +24,7 @@ create index if not exists idx_users_mobile on public.users(mobile_number);
 create table if not exists public.profiles (
     id uuid primary key default uuid_generate_v4(),
     user_id uuid not null unique,
+    gender text,
     height text,
     weight text,
     body_build text,

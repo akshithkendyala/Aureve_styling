@@ -101,13 +101,13 @@ MANDATORY TAXONOMY RULES:
    - footwear: Sneakers, Heels, Flats, Loafers, Formal Shoes, Sandals, Boots, Juttis, Mojaris, Wedges, Slides, Running Shoes, Kolhapuris, Slippers
    - bottoms: Jeans, Trousers, Wide-Leg Pants, Palazzos, Chinos, Formal Pants, Skirts, Shorts, Culottes, Cargo Pants, Salwars, Churidars, Leggings, Shararas, Track Pants, Joggers, Dhotis, Pajamas
    - layers: Blazers, Jackets, Cardigans, Shrugs, Bomber Jackets, Denim Jackets, Sweaters, Coats, Overshirts, Nehru Jackets, Windbreakers, Hoodies
-   - tops: T-Shirts, Shirts, Blouses, Crop Tops, Kurtis, Kurtas, Tunics, Polos, Overshirts, Sweaters, Peplum Tops, Tank Tops, Camisoles, Henleys, Sweatshirts, Hoodies, Dresses, Sarees
+   - tops: T-Shirts, Shirts, Blouses, Crop Tops, Kurtis, Kurtas, Tunics, Polos, Overshirts, Sweaters, Peplum Tops, Tank Tops, Camisoles, Henleys, Sweatshirts, Hoodies, Dresses, Sarees, Jumpsuits, Rompers, Anarkalis, Lehengas
 3. "subcategory": Must strictly match the chosen category from this list:
    - accessories: ["Watch", "Belt", "Handbag", "Sling Bag", "Tote", "Earrings", "Necklace", "Bracelet", "Jewellery", "Sunglasses", "Scarf", "Dupatta", "Ring", "Cap", "Hat", "Tie", "Pocket Square", "Wallet", "Other"]
    - footwear: ["Sneakers", "Heels", "Flats", "Loafers", "Formal Shoes", "Sandals", "Boots", "Juttis", "Mojaris", "Wedges", "Slides", "Running Shoes", "Kolhapuris", "Slippers", "Other"]
    - bottoms: ["Jeans", "Trousers", "Wide-Leg Pants", "Palazzo", "Chinos", "Formal Pants", "Skirt", "Shorts", "Culottes", "Cargo Pants", "Salwar", "Churidar", "Leggings", "Sharara", "Track Pants", "Joggers", "Dhoti", "Pajama", "Other"]
    - layers: ["Blazer", "Jacket", "Cardigan", "Shrug", "Bomber Jacket", "Denim Jacket", "Sweater", "Coat", "Overshirt", "Nehru Jacket", "Windbreaker", "Hoodie", "Other"]
-   - tops: ["T-Shirt", "Shirt", "Blouse", "Crop Top", "Kurti", "Kurta", "Tunic", "Polo", "Overshirt", "Sweater", "Peplum Top", "Tank Top", "Camisole", "Henley", "Sweatshirt", "Hoodie", "Dress", "Saree", "Other"]
+   - tops: ["T-Shirt", "Shirt", "Blouse", "Crop Top", "Kurti", "Kurta", "Tunic", "Polo", "Overshirt", "Sweater", "Peplum Top", "Tank Top", "Camisole", "Henley", "Sweatshirt", "Hoodie", "Dress", "Saree", "Jumpsuit", "Romper", "Anarkali", "Lehenga", "Other"]
 4. "primary_color": Strictly choose from: ${JSON.stringify(PRIMARY_COLOR_OPTIONS)}. (Accurately distinguish Black vs Charcoal vs Navy Blue vs Olive Green vs Brown vs Burgundy vs White vs Off-White vs Beige).
 5. "material": Strictly choose from: ${JSON.stringify(FABRIC_OPTIONS)}.
    - For leather belts/shoes/bags: choose "Leather" or "Suede".

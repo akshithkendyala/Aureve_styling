@@ -28,6 +28,10 @@ export const SUBCATEGORIES_BY_CATEGORY: Record<MainCategory, string[]> = {
     'Hoodie',
     'Dress',
     'Saree',
+    'Jumpsuit',
+    'Romper',
+    'Anarkali',
+    'Lehenga',
     'Other',
   ],
   bottoms: [
