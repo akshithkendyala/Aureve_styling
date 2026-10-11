@@ -16,45 +16,47 @@ export default function DashboardLayout({
   const [user, setUser] = useState<{ id: string; email?: string; name: string; mobile_number?: string; avatar_url?: string } | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadSession = React.useCallback(async () => {
+    setIsLoadingAuth(true);
+    setAuthError(null);
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.status === 401) {
+        router.push('/login');
+        return;
+      }
+      if (!res.ok) {
+        // Genuine server or database error: Rule D (Do not assume user is new / do not redirect to onboarding)
+        setAuthError('Unable to connect to your private styling vault. Your session is safe.');
+        setIsLoadingAuth(false);
+        return;
+      }
 
-    async function loadSession() {
-      try {
-        const res = await fetch('/api/auth/me');
-        if (!res.ok) {
-          if (isMounted) router.push('/login');
+      const data = await res.json();
+      if (data.authenticated && data.user) {
+        // Only redirect to onboarding if profile is explicitly incomplete
+        if (data.profile_completed === false) {
+          router.push('/onboarding');
           return;
         }
-        const data = await res.json();
-        if (data.authenticated && data.user) {
-          // If profile is incomplete, redirect to onboarding
-          if (data.profile && data.profile.profile_completed === false) {
-            if (isMounted) router.push('/onboarding');
-            return;
-          }
 
-          if (isMounted) {
-            setUser(data.user);
-          }
-        } else {
-          if (isMounted) router.push('/login');
-        }
-      } catch (err) {
-        console.error(err);
-        if (isMounted) router.push('/login');
-      } finally {
-        if (isMounted) setIsLoadingAuth(false);
+        setUser(data.user);
+      } else {
+        router.push('/login');
       }
+    } catch (err) {
+      console.error('Session verify network error:', err);
+      setAuthError('Connection issue communicating with AUREVÉ servers.');
+    } finally {
+      setIsLoadingAuth(false);
     }
-
-    loadSession();
-
-    return () => {
-      isMounted = false;
-    };
   }, [router]);
+
+  useEffect(() => {
+    loadSession();
+  }, [loadSession]);
 
   const handleItemAdded = (item: WardrobeItem) => {
     // Dispatch custom event so active pages (wardrobe, dashboard) can refresh
@@ -68,6 +70,28 @@ export default function DashboardLayout({
         <span className="font-serif text-lg font-medium text-[#18181B] tracking-wider">
           AUREVÉ
         </span>
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-[#FBF9F6] flex flex-col items-center justify-center p-4 text-center">
+        <div className="bg-white rounded-3xl border border-[#EBE5DB] shadow-xl p-8 max-w-md w-full space-y-5">
+          <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center mx-auto text-xl">
+            ✦
+          </div>
+          <div className="space-y-2">
+            <h2 className="font-serif text-2xl font-semibold text-[#18181B]">Connection Paused</h2>
+            <p className="text-xs text-[#7E6047] leading-relaxed">{authError}</p>
+          </div>
+          <button
+            onClick={() => loadSession()}
+            className="w-full bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] py-3 rounded-full text-xs font-semibold tracking-wider uppercase transition-all shadow-md"
+          >
+            Retry Connection
+          </button>
+        </div>
       </div>
     );
   }

@@ -160,6 +160,7 @@ export const Repository = {
 
   /**
    * Sync Google OAuth authenticated user into public.users and ensure initial profile exists
+   * CRITICAL: Must be completely idempotent, preserve existing display names, and NEVER wipe saved mobile numbers!
    */
   async syncUserFromAuth(authUser: {
     id: string;
@@ -175,56 +176,65 @@ export const Repository = {
     created_at?: string;
   }): Promise<User> {
     const userId = authUser.id;
-    const name =
+    const googleName =
       authUser.user_metadata?.name ||
       authUser.user_metadata?.full_name ||
       authUser.email?.split('@')[0] ||
       'Member';
-    const mobileNumber = authUser.user_metadata?.mobile_number || '';
+    const googleMobile = authUser.user_metadata?.mobile_number || '';
     const age = authUser.user_metadata?.age ? Number(authUser.user_metadata.age) : undefined;
     const avatarUrl =
       authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || '';
 
-    const user: User = {
-      id: userId,
-      email: authUser.email,
-      name,
-      mobile_number: mobileNumber,
-      age,
-      avatar_url: avatarUrl,
-      created_at: authUser.created_at || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    dbStore.users.set(userId, user);
+    let resolvedName = googleName;
+    let resolvedMobile = googleMobile;
 
     if (isSupabaseConfigured && supabaseAdmin) {
-      // 1. Sync public.users
+      // 1. Check if user already exists in public.users to preserve chosen display name & mobile
       try {
-        await supabaseAdmin.from('users').upsert(
-          {
-            id: userId,
-            name,
-            email: authUser.email || '',
-            mobile_number: mobileNumber || '',
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'id' }
-        );
+        const { data: existingUser } = await supabaseAdmin
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (existingUser) {
+          if (existingUser.name && existingUser.name.trim() !== '' && existingUser.name !== 'Member') {
+            resolvedName = existingUser.name;
+          }
+          if (existingUser.mobile_number && existingUser.mobile_number.trim() !== '') {
+            resolvedMobile = existingUser.mobile_number;
+          }
+        }
+
+        // Upsert into public.users without wiping existing fields
+        const userPayload: Record<string, any> = {
+          id: userId,
+          name: resolvedName,
+          email: authUser.email || existingUser?.email || '',
+          updated_at: new Date().toISOString(),
+        };
+        if (resolvedMobile) {
+          userPayload.mobile_number = resolvedMobile;
+        } else if (existingUser?.mobile_number) {
+          userPayload.mobile_number = existingUser.mobile_number;
+        }
+
+        await supabaseAdmin.from('users').upsert(userPayload, { onConflict: 'id' });
       } catch (err) {
         console.warn('syncUserFromAuth public.users error:', err);
       }
 
-      // 2. Check if profile already exists in public.profiles
+      // 2. Ensure profile exists in public.profiles safely without resetting completed profiles
       try {
-        const { data: existingProfile } = await supabaseAdmin
+        const { data: existingProfile, error: profErr } = await supabaseAdmin
           .from('profiles')
           .select('id, profile_completed')
           .eq('user_id', userId)
           .maybeSingle();
 
-        if (!existingProfile) {
-          // Create initial clean empty profile (NEVER pre-fill user measurements or preferences)
+        if (!existingProfile && !profErr) {
+          // Genuinely brand new user without a profile: create initial empty profile record
           await supabaseAdmin.from('profiles').insert({
             user_id: userId,
             city: null,
@@ -245,6 +255,18 @@ export const Repository = {
       }
     }
 
+    const user: User = {
+      id: userId,
+      email: authUser.email,
+      name: resolvedName,
+      mobile_number: resolvedMobile,
+      age,
+      avatar_url: avatarUrl,
+      created_at: authUser.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    dbStore.users.set(userId, user);
     return user;
   },
 
@@ -257,19 +279,30 @@ export const Repository = {
 
     let profileData: any = null;
     let userRecord: User | null = null;
+    let authUserMeta: any = null;
 
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
-        const [profileRes, userRes] = await Promise.all([
+        const [profileRes, userRes, authRes] = await Promise.all([
           supabaseAdmin.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
           this.findUserById(userId),
+          supabaseAdmin.auth.admin.getUserById(userId).catch(() => ({ data: null, error: null })),
         ]);
 
-        if (!profileRes.error && profileRes.data) {
-          profileData = profileRes.data;
+        if (profileRes.error) {
+          console.error('Supabase getUserProfile database error:', profileRes.error);
+          throw new Error(`Database error retrieving profile: ${profileRes.error.message}`);
         }
+
+        profileData = profileRes.data;
         userRecord = userRes;
-      } catch (err) {
+        if (authRes?.data?.user?.user_metadata) {
+          authUserMeta = authRes.data.user.user_metadata;
+        }
+      } catch (err: any) {
+        if (err.message?.startsWith('Database error')) {
+          throw err;
+        }
         console.warn('Supabase getUserProfile note:', err);
       }
     }
@@ -279,20 +312,29 @@ export const Repository = {
     }
 
     if (profileData) {
+      const resolvedName = (userRecord?.name || authUserMeta?.name || authUserMeta?.full_name || 'Member').trim();
+      const resolvedMobile = userRecord?.mobile_number || authUserMeta?.mobile_number || '';
+      const resolvedAge = userRecord?.age ?? (authUserMeta?.age ? Number(authUserMeta.age) : undefined);
+      const resolvedBuild = authUserMeta?.body_build || undefined;
+      const resolvedSkinConf =
+        authUserMeta?.skin_scan_confidence !== undefined ? Number(authUserMeta.skin_scan_confidence) : undefined;
+      const resolvedBodyConf =
+        authUserMeta?.body_scan_confidence !== undefined ? Number(authUserMeta.body_scan_confidence) : undefined;
+
       const prof: UserProfile = {
         id: profileData.id,
         user_id: userId,
-        email: userRecord?.email || '',
-        name: userRecord?.name || '',
-        full_name: userRecord?.name || '',
-        mobile_number: userRecord?.mobile_number || '',
-        age: userRecord?.age,
+        email: userRecord?.email || authUserMeta?.email || '',
+        name: resolvedName,
+        full_name: resolvedName,
+        mobile_number: resolvedMobile,
+        age: resolvedAge,
         height: profileData.height || undefined,
         weight: profileData.weight || undefined,
-        body_build: profileData.body_build || undefined,
-        body_scan_confidence: profileData.body_scan_confidence !== undefined && profileData.body_scan_confidence !== null ? Number(profileData.body_scan_confidence) : undefined,
+        body_build: resolvedBuild,
+        body_scan_confidence: resolvedBodyConf,
         skin_tone: profileData.skin_tone || undefined,
-        skin_scan_confidence: profileData.skin_scan_confidence !== undefined && profileData.skin_scan_confidence !== null ? Number(profileData.skin_scan_confidence) : undefined,
+        skin_scan_confidence: resolvedSkinConf,
         preferred_fit: profileData.preferred_fit || undefined,
         favorite_colors: Array.isArray(profileData.favorite_colors) ? profileData.favorite_colors : [],
         avoided_colors: Array.isArray(profileData.avoided_colors) ? profileData.avoided_colors : [],
@@ -353,8 +395,23 @@ export const Repository = {
       ? normalizeMobileNumber(profileData.mobile_number) || profileData.mobile_number
       : existing?.mobile_number || '';
 
-    const preferredName = (profileData.name || profileData.full_name || existing?.name || existing?.full_name || '').trim();
+    const preferredName = (
+      profileData.name ||
+      profileData.full_name ||
+      existing?.name ||
+      existing?.full_name ||
+      ''
+    ).trim();
     const userAge = profileData.age !== undefined ? Number(profileData.age) : existing?.age;
+    const bodyBuild = profileData.body_build !== undefined ? profileData.body_build : existing?.body_build;
+    const skinScanConf =
+      profileData.skin_scan_confidence !== undefined
+        ? profileData.skin_scan_confidence
+        : existing?.skin_scan_confidence;
+    const bodyScanConf =
+      profileData.body_scan_confidence !== undefined
+        ? profileData.body_scan_confidence
+        : existing?.body_scan_confidence;
 
     const updated: UserProfile = {
       id: existing?.id || generateId(),
@@ -366,23 +423,23 @@ export const Repository = {
       age: userAge,
       height: profileData.height !== undefined ? profileData.height : existing?.height,
       weight: profileData.weight !== undefined ? profileData.weight : existing?.weight,
-      body_build: profileData.body_build !== undefined ? profileData.body_build : existing?.body_build,
-      body_scan_confidence: profileData.body_scan_confidence !== undefined ? profileData.body_scan_confidence : existing?.body_scan_confidence,
+      body_build: bodyBuild,
+      body_scan_confidence: bodyScanConf,
       skin_tone: profileData.skin_tone !== undefined ? profileData.skin_tone : existing?.skin_tone,
-      skin_scan_confidence: profileData.skin_scan_confidence !== undefined ? profileData.skin_scan_confidence : existing?.skin_scan_confidence,
+      skin_scan_confidence: skinScanConf,
       preferred_fit: profileData.preferred_fit !== undefined ? profileData.preferred_fit : existing?.preferred_fit,
       favorite_colors:
         profileData.favorite_colors !== undefined
           ? profileData.favorite_colors
-          : (existing?.favorite_colors || []),
+          : existing?.favorite_colors || [],
       avoided_colors:
         profileData.avoided_colors !== undefined
           ? profileData.avoided_colors
-          : (existing?.avoided_colors || []),
+          : existing?.avoided_colors || [],
       style_preferences:
         profileData.style_preferences !== undefined
           ? profileData.style_preferences
-          : (existing?.style_preferences || []),
+          : existing?.style_preferences || [],
       comfort_preference:
         profileData.comfort_preference !== undefined
           ? profileData.comfort_preference
@@ -390,12 +447,12 @@ export const Repository = {
       typical_occasions:
         profileData.typical_occasions !== undefined
           ? profileData.typical_occasions
-          : (existing?.typical_occasions || []),
+          : existing?.typical_occasions || [],
       city: profileData.city !== undefined ? profileData.city : existing?.city,
       profile_completed:
         profileData.profile_completed !== undefined
           ? profileData.profile_completed
-          : (existing?.profile_completed ?? false),
+          : existing?.profile_completed ?? false,
       created_at: existing?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -413,25 +470,25 @@ export const Repository = {
           userUpdatePayload.email = updated.email;
         }
 
-        await supabaseAdmin.from('users').upsert(
-          userUpdatePayload,
-          { onConflict: 'id' }
-        );
+        await supabaseAdmin.from('users').upsert(userUpdatePayload, { onConflict: 'id' });
 
-        // Update auth user metadata
+        // Update auth user metadata with full profile details (including body_build, age, scan confidence)
         await supabaseAdmin.auth.admin.updateUserById(userId, {
           user_metadata: {
             name: preferredName,
             full_name: preferredName,
             mobile_number: cleanMobile,
             age: userAge,
+            body_build: bodyBuild,
+            body_scan_confidence: bodyScanConf,
+            skin_scan_confidence: skinScanConf,
           },
         });
       } catch (userSyncErr) {
         console.warn('User metadata sync note:', userSyncErr);
       }
 
-      // 2. Update public.profiles
+      // 2. Update public.profiles with ONLY columns that exist on profiles table
       try {
         const { data, error } = await supabaseAdmin
           .from('profiles')
@@ -440,10 +497,7 @@ export const Repository = {
               user_id: userId,
               height: updated.height,
               weight: updated.weight,
-              body_build: updated.body_build,
-              body_scan_confidence: updated.body_scan_confidence,
               skin_tone: updated.skin_tone,
-              skin_scan_confidence: updated.skin_scan_confidence,
               preferred_fit: updated.preferred_fit,
               favorite_colors: updated.favorite_colors,
               avoided_colors: updated.avoided_colors,
@@ -459,11 +513,17 @@ export const Repository = {
           .select('*')
           .single();
 
-        if (!error && data) {
+        if (error) {
+          console.error('Supabase profiles.upsert error:', error);
+          throw new Error(`Failed to save profile: ${error.message}`);
+        }
+
+        if (data) {
           updated.id = data.id;
         }
-      } catch (err) {
-        console.warn('Supabase upsertUserProfile note:', err);
+      } catch (err: any) {
+        console.error('CRITICAL: Supabase upsertUserProfile error:', err);
+        throw err;
       }
     }
 

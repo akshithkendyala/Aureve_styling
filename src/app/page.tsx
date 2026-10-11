@@ -15,10 +15,14 @@ import {
   Heart,
   ChevronRight,
 } from 'lucide-react';
+import { GoogleOneTap } from '@/components/auth/GoogleOneTap';
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#FBF9F6] text-[#18181B] selection:bg-[#221A13] selection:text-[#FAF8F5]">
+      {/* Google One Tap integration */}
+      <GoogleOneTap />
+
       {/* Top Floating Luxury Header */}
       <header className="sticky top-0 z-50 w-full bg-[#FBF9F6]/85 backdrop-blur-md border-b border-[#EBE5DB]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 sm:h-20 flex items-center justify-between">

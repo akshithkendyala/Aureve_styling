@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ShieldCheck, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { GoogleOneTap } from '@/components/auth/GoogleOneTap';
 
 function LoginForm() {
   const router = useRouter();
@@ -43,7 +44,7 @@ function LoginForm() {
         if (res.ok) {
           const data = await res.json();
           if (data.authenticated) {
-            router.push(data.profile_completed ? '/dashboard' : '/onboarding');
+            window.location.href = data.profile_completed ? '/dashboard' : '/onboarding';
           }
         }
       } catch {
@@ -51,7 +52,7 @@ function LoginForm() {
       }
     }
     checkExistingAuth();
-  }, [router]);
+  }, []);
 
   const handleGoogleSignIn = async () => {
     if (isLoading) return;
@@ -130,6 +131,9 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen bg-[#FBF9F6] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+      {/* Official Google One Tap Prompt */}
+      <GoogleOneTap onError={(msg) => setError(msg)} />
+
       {/* Background Decorative Accent */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-72 bg-[#F4EFEA] rounded-b-[100px] blur-3xl -z-0 opacity-60 pointer-events-none" />
 

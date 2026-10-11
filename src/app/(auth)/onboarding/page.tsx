@@ -223,7 +223,11 @@ export default function OnboardingPage() {
       try {
         const res = await fetch('/api/auth/me');
         if (!res.ok) {
-          router.push('/login');
+          if (res.status === 401) {
+            router.push('/login');
+          } else {
+            setStepError('Unable to load your profile right now. Please refresh the page to retry.');
+          }
           return;
         }
 
@@ -232,8 +236,8 @@ export default function OnboardingPage() {
           setUserEmail(data.user.email || '');
 
           // If user already completed onboarding, redirect straight to dashboard
-          if (data.profile?.profile_completed === true) {
-            router.push('/dashboard');
+          if (data.profile_completed === true || data.profile?.profile_completed === true) {
+            window.location.href = '/dashboard';
             return;
           }
 
