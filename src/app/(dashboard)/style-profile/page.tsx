@@ -84,18 +84,26 @@ export default function StyleProfilePage() {
     setIsLoading(true);
     setLoadError('');
     try {
-      const res = await fetch('/api/profile');
-      if (res.ok) {
-        const data = await res.json();
+      const [pRes, meRes] = await Promise.all([
+        fetch('/api/profile'),
+        fetch('/api/auth/me'),
+      ]);
+
+      const meData = meRes.ok ? await meRes.json().catch(() => null) : null;
+      if (pRes.ok) {
+        const data = await pRes.json();
         if (data.profile) {
           const p = data.profile;
           setProfile(p);
-          if (p.name) setName(p.name);
-          if (p.email) setEmail(p.email);
+          const userName = p.name || p.full_name || meData?.user?.name || '';
+          if (userName) setName(userName);
+          const userEmail = p.email || meData?.user?.email || '';
+          if (userEmail) setEmail(userEmail);
           if (p.age) setAge(String(p.age));
           if (p.gender) setGender(p.gender);
-          if (p.mobile_number) {
-            const rawDigits = p.mobile_number.replace(/\D/g, '');
+          const rawMob = p.mobile_number || meData?.user?.mobile_number;
+          if (rawMob) {
+            const rawDigits = rawMob.replace(/\D/g, '');
             setMobileNumber(rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits);
           }
           if (p.height) setHeight(p.height);
@@ -113,7 +121,7 @@ export default function StyleProfilePage() {
           if (p.city) setCity(p.city);
         }
       } else {
-        const errData = await res.json().catch(() => null);
+        const errData = await pRes.json().catch(() => null);
         setLoadError(errData?.error || 'Failed to load your profile. Please check your connection.');
       }
     } catch (err: any) {
@@ -168,15 +176,12 @@ export default function StyleProfilePage() {
     setSavedSuccess(false);
     setSaveError('');
 
-    if (!name.trim()) {
-      setSaveError('Please enter your preferred name.');
-      setIsSaving(false);
-      return;
-    }
+    const resolvedName = name.trim() || profile?.name || 'Member';
 
     if (mobileNumber && !isValidIndianMobile(mobileNumber)) {
       setSaveError('Please enter a valid 10-digit Indian mobile number.');
       setIsSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -184,6 +189,7 @@ export default function StyleProfilePage() {
     if (parsedAge !== undefined && (isNaN(parsedAge) || parsedAge < 13 || parsedAge > 120)) {
       setSaveError('Please enter a valid age between 13 and 120.');
       setIsSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -192,8 +198,9 @@ export default function StyleProfilePage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: name.trim(),
-          full_name: name.trim(),
+          from_style_profile: true,
+          name: resolvedName,
+          full_name: resolvedName,
           mobile_number: mobileNumber ? normalizeMobileNumber(mobileNumber) : undefined,
           age: parsedAge,
           gender: gender || undefined,
@@ -216,10 +223,9 @@ export default function StyleProfilePage() {
 
       if (res.ok) {
         setSavedSuccess(true);
-        // Confirmed database save: automatically redirect to dashboard
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 1200);
+        // Direct, immediate automatic redirect to dashboard
+        window.location.href = '/dashboard';
+        return;
       } else {
         const d = await res.json().catch(() => null);
         setSaveError(d?.error || 'Failed to save styling profile. Please try again.');
@@ -798,24 +804,40 @@ export default function StyleProfilePage() {
         </div>
 
         {/* Submit */}
-        <div className="flex justify-end pt-2">
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="px-8 py-3.5 rounded-full bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] text-xs font-semibold tracking-wide uppercase transition-all shadow-md flex items-center space-x-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-          >
-            {isSaving ? (
-              <div className="flex items-center space-x-2">
-                <div className="w-3.5 h-3.5 border-2 border-[#FAF8F5] border-t-transparent rounded-full animate-spin" />
-                <span>Saving...</span>
-              </div>
-            ) : (
-              <>
-                <span>Save Styling Profile</span>
-                <Sparkles className="w-4 h-4" />
-              </>
-            )}
-          </button>
+        <div className="space-y-3 pt-2">
+          {saveError && (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 flex items-center space-x-2 animate-in fade-in duration-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-600 flex-shrink-0" />
+              <span>{saveError}</span>
+            </div>
+          )}
+
+          {savedSuccess && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 flex items-center space-x-2 animate-in fade-in duration-200">
+              <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span>Style profile saved successfully! Redirecting to dashboard…</span>
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-8 py-3.5 rounded-full bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] text-xs font-semibold tracking-wide uppercase transition-all shadow-md flex items-center space-x-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <div className="flex items-center space-x-2">
+                  <div className="w-3.5 h-3.5 border-2 border-[#FAF8F5] border-t-transparent rounded-full animate-spin" />
+                  <span>Saving...</span>
+                </div>
+              ) : (
+                <>
+                  <span>Save Styling Profile</span>
+                  <Sparkles className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </form>
 

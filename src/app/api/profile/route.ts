@@ -64,10 +64,12 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    // If attempting to complete profile, enforce required fields (Name, Mobile, Age)
-    if (updates.profile_completed === true) {
-      const existingProfile = await Repository.getUserProfile(session.userId);
+    const existingProfile = await Repository.getUserProfile(session.userId);
 
+    // Only enforce mandatory mobile/age during first-time onboarding completion
+    const isFirstTimeOnboarding = updates.is_onboarding === true || (!existingProfile?.profile_completed && updates.profile_completed === true && !updates.from_style_profile);
+
+    if (isFirstTimeOnboarding) {
       const targetName = (updates.name || updates.full_name || existingProfile?.name || '').trim();
       if (!targetName) {
         return NextResponse.json(
@@ -95,6 +97,19 @@ export async function PUT(req: NextRequest) {
         );
       }
       updates.age = targetAge;
+    } else {
+      // Styling profile edit mode: retain existing required fields if not provided
+      const resolvedName = (updates.name || updates.full_name || existingProfile?.name || session.name || 'Member').trim();
+      updates.name = resolvedName;
+      updates.full_name = resolvedName;
+
+      if (updates.mobile_number === undefined && existingProfile?.mobile_number) {
+        updates.mobile_number = existingProfile.mobile_number;
+      }
+      if (updates.age === undefined && existingProfile?.age) {
+        updates.age = existingProfile.age;
+      }
+      updates.profile_completed = true;
     }
 
     const updatedProfile = await Repository.upsertUserProfile(session.userId, updates);

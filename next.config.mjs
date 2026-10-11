@@ -29,6 +29,10 @@ const nextConfig = {
         source: '/my-style',
         destination: '/style-profile',
       },
+      {
+        source: '/style_profile',
+        destination: '/style-profile',
+      },
     ];
   },
 };
