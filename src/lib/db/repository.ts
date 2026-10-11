@@ -96,11 +96,14 @@ export const Repository = {
 
         if (!dbErr && dbUser) {
           const finalEmail = dbUser.email || authEmail || '';
+          const rawMobile = dbUser.mobile_number || authMobile || '';
+          const cleanMobile = rawMobile.startsWith('no_mobile_') ? (authMobile || '') : rawMobile;
+
           const user: User = {
             id: dbUser.id,
             email: finalEmail,
             name: dbUser.name || authName || 'Member',
-            mobile_number: dbUser.mobile_number || authMobile || '',
+            mobile_number: cleanMobile,
             age: authAge,
             avatar_url: authAvatar,
             created_at: dbUser.created_at,
@@ -131,16 +134,19 @@ export const Repository = {
             updated_at: new Date().toISOString(),
           };
           try {
-            await supabaseAdmin.from('users').upsert(
-              {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                mobile_number: user.mobile_number || '',
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: 'id' }
-            );
+            const dbMobile = user.mobile_number || `no_mobile_${user.id}`;
+            const userPayload: Record<string, any> = {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              mobile_number: dbMobile,
+              updated_at: new Date().toISOString(),
+            };
+            const { error: syncErr } = await supabaseAdmin.from('users').upsert(userPayload, { onConflict: 'id' });
+            if (syncErr && syncErr.code === '23505' && syncErr.message && syncErr.message.includes('users_mobile_number_key')) {
+              userPayload.mobile_number = `no_mobile_${user.id}`;
+              await supabaseAdmin.from('users').upsert(userPayload, { onConflict: 'id' });
+            }
           } catch (syncErr) {
             console.warn('Auto-sync public.users error:', syncErr);
           }
@@ -203,25 +209,29 @@ export const Repository = {
           if (existingUser.name && existingUser.name.trim() !== '' && existingUser.name !== 'Member') {
             resolvedName = existingUser.name;
           }
-          if (existingUser.mobile_number && existingUser.mobile_number.trim() !== '') {
+          if (existingUser.mobile_number && existingUser.mobile_number.trim() !== '' && !existingUser.mobile_number.startsWith('no_mobile_')) {
             resolvedMobile = existingUser.mobile_number;
           }
         }
+
+        const validMobile = (resolvedMobile && !resolvedMobile.startsWith('no_mobile_'))
+          ? resolvedMobile
+          : (existingUser?.mobile_number && !existingUser.mobile_number.startsWith('no_mobile_') ? existingUser.mobile_number : `no_mobile_${userId}`);
 
         // Upsert into public.users without wiping existing fields
         const userPayload: Record<string, any> = {
           id: userId,
           name: resolvedName,
           email: authUser.email || existingUser?.email || '',
+          mobile_number: validMobile,
           updated_at: new Date().toISOString(),
         };
-        if (resolvedMobile) {
-          userPayload.mobile_number = resolvedMobile;
-        } else if (existingUser?.mobile_number) {
-          userPayload.mobile_number = existingUser.mobile_number;
-        }
 
-        await supabaseAdmin.from('users').upsert(userPayload, { onConflict: 'id' });
+        let { error: upsertErr } = await supabaseAdmin.from('users').upsert(userPayload, { onConflict: 'id' });
+        if (upsertErr && upsertErr.code === '23505' && upsertErr.message && upsertErr.message.includes('users_mobile_number_key')) {
+          userPayload.mobile_number = `no_mobile_${userId}`;
+          await supabaseAdmin.from('users').upsert(userPayload, { onConflict: 'id' });
+        }
       } catch (err) {
         console.warn('syncUserFromAuth public.users error:', err);
       }
@@ -469,24 +479,56 @@ export const Repository = {
     if (isSupabaseConfigured && supabaseAdmin) {
       // 1. Sync public.users first (due to foreign key constraint)
       try {
+        const validMobile = (cleanMobile && !cleanMobile.startsWith('no_mobile_')) ? cleanMobile : `no_mobile_${userId}`;
         const userUpdatePayload: Record<string, any> = {
           id: userId,
           name: preferredName,
-          mobile_number: cleanMobile || '',
+          mobile_number: validMobile,
           updated_at: new Date().toISOString(),
         };
         if (updated.email) {
           userUpdatePayload.email = updated.email;
         }
 
-        await supabaseAdmin.from('users').upsert(userUpdatePayload, { onConflict: 'id' });
+        let { error: uErr } = await supabaseAdmin.from('users').upsert(userUpdatePayload, { onConflict: 'id' });
+
+        // If mobile unique constraint triggered, fall back to unique placeholder for user record
+        if (uErr && uErr.code === '23505' && uErr.message && uErr.message.includes('users_mobile_number_key')) {
+          console.warn('Mobile unique constraint triggered; falling back to placeholder mobile for safety:', uErr.message);
+          userUpdatePayload.mobile_number = `no_mobile_${userId}`;
+          const retry = await supabaseAdmin.from('users').upsert(userUpdatePayload, { onConflict: 'id' });
+          uErr = retry.error;
+        }
+
+        // If duplicate email constraint triggered with an orphaned user row (deleted from auth)
+        if (uErr && uErr.code === '23505' && uErr.message && uErr.message.includes('users_email_key') && updated.email) {
+          const { data: conflictUser } = await supabaseAdmin
+            .from('users')
+            .select('id')
+            .eq('email', updated.email)
+            .maybeSingle();
+
+          if (conflictUser && conflictUser.id !== userId) {
+            const { data: authCheck } = await supabaseAdmin.auth.admin.getUserById(conflictUser.id);
+            if (!authCheck?.user) {
+              await supabaseAdmin.from('users').delete().eq('id', conflictUser.id);
+              const retryEmail = await supabaseAdmin.from('users').upsert(userUpdatePayload, { onConflict: 'id' });
+              uErr = retryEmail.error;
+            }
+          }
+        }
+
+        if (uErr) {
+          console.error('CRITICAL: Failed to sync public.users before profile upsert:', uErr);
+          throw new Error(`Failed to initialize user record: ${uErr.message}`);
+        }
 
         // Update auth user metadata with full profile details (including gender, body_build, age, scan confidence)
         await supabaseAdmin.auth.admin.updateUserById(userId, {
           user_metadata: {
             name: preferredName,
             full_name: preferredName,
-            mobile_number: cleanMobile,
+            mobile_number: (cleanMobile && !cleanMobile.startsWith('no_mobile_')) ? cleanMobile : '',
             age: userAge,
             gender: gender || undefined,
             body_build: bodyBuild,
@@ -494,8 +536,11 @@ export const Repository = {
             skin_scan_confidence: skinScanConf,
           },
         });
-      } catch (userSyncErr) {
+      } catch (userSyncErr: any) {
         console.warn('User metadata sync note:', userSyncErr);
+        if (userSyncErr?.message && userSyncErr.message.startsWith('Failed to initialize user record:')) {
+          throw userSyncErr;
+        }
       }
 
       // 2. Update public.profiles with valid columns

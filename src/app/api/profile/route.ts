@@ -115,8 +115,11 @@ export async function PUT(req: NextRequest) {
     const updatedProfile = await Repository.upsertUserProfile(session.userId, updates);
 
     return NextResponse.json({ success: true, profile: updatedProfile });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Update profile error:', error);
-    return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
+    return NextResponse.json(
+      { error: error?.message || 'Failed to update profile' },
+      { status: 500 }
+    );
   }
 }
