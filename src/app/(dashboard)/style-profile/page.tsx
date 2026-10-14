@@ -222,10 +222,16 @@ export default function StyleProfilePage() {
       });
 
       if (res.ok) {
-        setSavedSuccess(true);
-        // Direct, immediate automatic redirect to dashboard
-        window.location.href = '/dashboard';
-        return;
+        const d = await res.json().catch(() => null);
+        if (d?.success && d?.profile?.profile_completed) {
+          setSavedSuccess(true);
+          // Confirmed database persistence - automatic redirect to dashboard
+          window.location.replace('/dashboard');
+          return;
+        } else {
+          setSaveError('Profile update could not be confirmed by the database. Please try again.');
+          setIsSaving(false);
+        }
       } else {
         const d = await res.json().catch(() => null);
         setSaveError(d?.error || 'Failed to save styling profile. Please try again.');
@@ -234,8 +240,6 @@ export default function StyleProfilePage() {
     } catch (e) {
       console.error('Save profile error:', e);
       setSaveError('A connection error occurred while saving your profile.');
-      setIsSaving(false);
-    } finally {
       setIsSaving(false);
     }
   };

@@ -238,7 +238,7 @@ export default function OnboardingPage() {
 
           // If user already completed onboarding, redirect straight to dashboard
           if (data.profile_completed === true || data.profile?.profile_completed === true) {
-            window.location.href = '/dashboard';
+            window.location.replace('/dashboard');
             return;
           }
 
@@ -259,6 +259,7 @@ export default function OnboardingPage() {
             const p = data.profile;
             if (p.name && !name) setName(p.name);
             if (p.age) setAge(String(p.age));
+            if (p.gender) setGender(p.gender);
             if (p.mobile_number) {
               const rawDigits = p.mobile_number.replace(/\D/g, '');
               if (rawDigits.length >= 10) setMobileNumber(rawDigits.slice(-10));
@@ -317,14 +318,13 @@ export default function OnboardingPage() {
           } catch {
             // Ignore parse error
           }
+          setIsLoadingUser(false);
         } else {
-          router.push('/login');
+          window.location.replace('/login');
         }
       } catch (err) {
         console.error(err);
-        router.push('/login');
-      } finally {
-        setIsLoadingUser(false);
+        window.location.replace('/login');
       }
     }
 
@@ -502,26 +502,107 @@ export default function OnboardingPage() {
     setIsSaving(true);
     setStepError('');
 
-    if (typicalOccasions.length === 0) {
-      setStepError('Please select at least 1 typical occasion for your lifestyle.');
+    // Comprehensive client-side verification across all 4 steps
+    if (!name.trim()) {
+      setStepError('Please enter your name in Step 1 (Personal Info).');
+      setCurrentStep(1);
       setIsSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-
-    if (!comfortPreference) {
-      setStepError('Please select your comfort vs structure preference.');
+    if (!mobileNumber || !isValidIndianMobile(mobileNumber)) {
+      setStepError('Please enter a valid 10-digit Indian mobile number in Step 1.');
+      setCurrentStep(1);
       setIsSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const parsedAge = Number(age);
+    if (!age || isNaN(parsedAge) || parsedAge < 13 || parsedAge > 120) {
+      setStepError('Please enter your age (13-120) in Step 1.');
+      setCurrentStep(1);
+      setIsSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!city) {
+      setStepError('Please select your home city in Step 1.');
+      setCurrentStep(1);
+      setIsSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
     const finalHeight = getFormattedHeight();
+    if (!finalHeight) {
+      setStepError('Please select your height in Step 2 (Proportions).');
+      setCurrentStep(2);
+      setIsSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     const finalWeight = getFormattedWeight();
+    if (!finalWeight) {
+      setStepError('Please enter your weight in Step 2 (Proportions).');
+      setCurrentStep(2);
+      setIsSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!bodyBuild) {
+      setStepError('Please select your body build in Step 2.');
+      setCurrentStep(2);
+      setIsSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!skinTone) {
+      setStepError('Please select your skin undertone in Step 2.');
+      setCurrentStep(2);
+      setIsSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!preferredFit) {
+      setStepError('Please select your preferred clothing fit in Step 2.');
+      setCurrentStep(2);
+      setIsSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (favoriteColors.length === 0) {
+      setStepError('Please select at least 1 favorite color in Step 3 (Palette).');
+      setCurrentStep(3);
+      setIsSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (stylePrefs.length === 0) {
+      setStepError('Please select at least 1 style aesthetic in Step 3.');
+      setCurrentStep(3);
+      setIsSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (typicalOccasions.length === 0) {
+      setStepError('Please select at least 1 typical occasion for your lifestyle in Step 4.');
+      setIsSaving(false);
+      return;
+    }
+    if (!comfortPreference) {
+      setStepError('Please select your comfort vs structure preference in Step 4.');
+      setIsSaving(false);
+      return;
+    }
 
     try {
       const res = await fetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          is_onboarding: true,
           name: name.trim(),
           full_name: name.trim(),
           mobile_number: normalizeMobileNumber(mobileNumber),
@@ -545,13 +626,20 @@ export default function OnboardingPage() {
       });
 
       if (!res.ok) {
-        const d = await res.json();
-        setStepError(d.error || 'Failed to save style profile. Please try again.');
+        const d = await res.json().catch(() => null);
+        setStepError(d?.error || 'Failed to save style profile. Please try again.');
         setIsSaving(false);
         return;
       }
 
-      // Clear draft buffer
+      const saveResult = await res.json().catch(() => null);
+      if (!saveResult?.success || !saveResult?.profile?.profile_completed) {
+        setStepError('Database persistence could not be verified. Please try again.');
+        setIsSaving(false);
+        return;
+      }
+
+      // Clear draft buffer only after confirmed database write
       try {
         localStorage.removeItem('aureve_onboarding_draft');
       } catch {
@@ -559,7 +647,7 @@ export default function OnboardingPage() {
       }
 
       // Smoothly enter Dashboard
-      window.location.href = '/dashboard';
+      window.location.replace('/dashboard');
     } catch (err) {
       console.error(err);
       setStepError('A connection error occurred. Please try again.');

@@ -97,6 +97,78 @@ export async function PUT(req: NextRequest) {
         );
       }
       updates.age = targetAge;
+
+      if (!updates.city) {
+        return NextResponse.json(
+          { error: 'Please select your home city for climate calibration.' },
+          { status: 400 }
+        );
+      }
+
+      if (!updates.height) {
+        return NextResponse.json(
+          { error: 'Please select your height in Step 2 (Proportions).' },
+          { status: 400 }
+        );
+      }
+
+      if (!updates.weight) {
+        return NextResponse.json(
+          { error: 'Please enter your weight in Step 2 (Proportions).' },
+          { status: 400 }
+        );
+      }
+
+      if (!updates.body_build) {
+        return NextResponse.json(
+          { error: 'Please select your body build in Step 2 (Proportions).' },
+          { status: 400 }
+        );
+      }
+
+      if (!updates.skin_tone) {
+        return NextResponse.json(
+          { error: 'Please select your skin undertone in Step 2 (Proportions).' },
+          { status: 400 }
+        );
+      }
+
+      if (!updates.preferred_fit) {
+        return NextResponse.json(
+          { error: 'Please select your preferred clothing fit in Step 2 (Proportions).' },
+          { status: 400 }
+        );
+      }
+
+      if (!Array.isArray(updates.favorite_colors) || updates.favorite_colors.length === 0) {
+        return NextResponse.json(
+          { error: 'Please select at least 1 favorite color in Step 3 (Palette).' },
+          { status: 400 }
+        );
+      }
+
+      if (!Array.isArray(updates.style_preferences) || updates.style_preferences.length === 0) {
+        return NextResponse.json(
+          { error: 'Please select at least 1 style aesthetic in Step 3 (Palette).' },
+          { status: 400 }
+        );
+      }
+
+      if (!Array.isArray(updates.typical_occasions) || updates.typical_occasions.length === 0) {
+        return NextResponse.json(
+          { error: 'Please select at least 1 typical occasion in Step 4 (Lifestyle).' },
+          { status: 400 }
+        );
+      }
+
+      if (!updates.comfort_preference) {
+        return NextResponse.json(
+          { error: 'Please select your comfort vs structure preference in Step 4 (Lifestyle).' },
+          { status: 400 }
+        );
+      }
+
+      updates.profile_completed = true;
     } else {
       // Styling profile edit mode: retain existing required fields if not provided
       const resolvedName = (updates.name || updates.full_name || existingProfile?.name || session.name || 'Member').trim();
@@ -109,7 +181,42 @@ export async function PUT(req: NextRequest) {
       if (updates.age === undefined && existingProfile?.age) {
         updates.age = existingProfile.age;
       }
-      updates.profile_completed = true;
+      if (updates.city === undefined && existingProfile?.city) {
+        updates.city = existingProfile.city;
+      }
+      if (updates.height === undefined && existingProfile?.height) {
+        updates.height = existingProfile.height;
+      }
+      if (updates.weight === undefined && existingProfile?.weight) {
+        updates.weight = existingProfile.weight;
+      }
+      if (updates.body_build === undefined && existingProfile?.body_build) {
+        updates.body_build = existingProfile.body_build;
+      }
+      if (updates.skin_tone === undefined && existingProfile?.skin_tone) {
+        updates.skin_tone = existingProfile.skin_tone;
+      }
+      if (updates.preferred_fit === undefined && existingProfile?.preferred_fit) {
+        updates.preferred_fit = existingProfile.preferred_fit;
+      }
+      if (updates.comfort_preference === undefined && existingProfile?.comfort_preference) {
+        updates.comfort_preference = existingProfile.comfort_preference;
+      }
+      if (updates.favorite_colors === undefined && existingProfile?.favorite_colors) {
+        updates.favorite_colors = existingProfile.favorite_colors;
+      }
+      if (updates.avoided_colors === undefined && existingProfile?.avoided_colors) {
+        updates.avoided_colors = existingProfile.avoided_colors;
+      }
+      if (updates.style_preferences === undefined && existingProfile?.style_preferences) {
+        updates.style_preferences = existingProfile.style_preferences;
+      }
+      if (updates.typical_occasions === undefined && existingProfile?.typical_occasions) {
+        updates.typical_occasions = existingProfile.typical_occasions;
+      }
+
+      // Preserve profile completion or mark complete if previously completed
+      updates.profile_completed = existingProfile?.profile_completed ?? true;
     }
 
     const updatedProfile = await Repository.upsertUserProfile(session.userId, updates);

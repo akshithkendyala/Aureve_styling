@@ -321,20 +321,30 @@ export const Repository = {
       }
     }
 
+    const cached = dbStore.profiles.get(userId);
+
     if (!userRecord) {
       userRecord = dbStore.users.get(userId) || null;
     }
 
     if (profileData) {
-      const resolvedName = (userRecord?.name || authUserMeta?.name || authUserMeta?.full_name || 'Member').trim();
-      const resolvedMobile = userRecord?.mobile_number || authUserMeta?.mobile_number || '';
-      const resolvedAge = userRecord?.age ?? (authUserMeta?.age ? Number(authUserMeta.age) : undefined);
-      const resolvedGender = (profileData as any).gender || authUserMeta?.gender || undefined;
-      const resolvedBuild = authUserMeta?.body_build || undefined;
+      const resolvedName = (userRecord?.name || authUserMeta?.name || authUserMeta?.full_name || cached?.name || 'Member').trim();
+      const resolvedMobile = userRecord?.mobile_number || authUserMeta?.mobile_number || cached?.mobile_number || '';
+      const resolvedAge = userRecord?.age ?? (authUserMeta?.age ? Number(authUserMeta.age) : cached?.age);
+      const resolvedGender = (profileData as any).gender || authUserMeta?.gender || cached?.gender || undefined;
+      const resolvedBuild = (profileData as any).body_build || authUserMeta?.body_build || cached?.body_build || undefined;
       const resolvedSkinConf =
-        authUserMeta?.skin_scan_confidence !== undefined ? Number(authUserMeta.skin_scan_confidence) : undefined;
+        (profileData as any).skin_scan_confidence !== undefined
+          ? Number((profileData as any).skin_scan_confidence)
+          : authUserMeta?.skin_scan_confidence !== undefined
+          ? Number(authUserMeta.skin_scan_confidence)
+          : cached?.skin_scan_confidence;
       const resolvedBodyConf =
-        authUserMeta?.body_scan_confidence !== undefined ? Number(authUserMeta.body_scan_confidence) : undefined;
+        (profileData as any).body_scan_confidence !== undefined
+          ? Number((profileData as any).body_scan_confidence)
+          : authUserMeta?.body_scan_confidence !== undefined
+          ? Number(authUserMeta.body_scan_confidence)
+          : cached?.body_scan_confidence;
 
       const prof: UserProfile = {
         id: profileData.id,
@@ -366,7 +376,6 @@ export const Repository = {
       return prof;
     }
 
-    const cached = dbStore.profiles.get(userId);
     if (cached) {
       return {
         ...cached,
@@ -543,7 +552,7 @@ export const Repository = {
         }
       }
 
-      // 2. Update public.profiles with valid columns
+      // 2. Update public.profiles with schema-resilient upsert
       try {
         const profilePayload: Record<string, any> = {
           user_id: userId,
@@ -551,45 +560,92 @@ export const Repository = {
           weight: updated.weight,
           skin_tone: updated.skin_tone,
           preferred_fit: updated.preferred_fit,
-          favorite_colors: updated.favorite_colors,
-          avoided_colors: updated.avoided_colors,
-          style_preferences: updated.style_preferences,
+          favorite_colors: Array.isArray(updated.favorite_colors) ? updated.favorite_colors : [],
+          avoided_colors: Array.isArray(updated.avoided_colors) ? updated.avoided_colors : [],
+          style_preferences: Array.isArray(updated.style_preferences) ? updated.style_preferences : [],
           comfort_preference: updated.comfort_preference,
-          typical_occasions: updated.typical_occasions,
+          typical_occasions: Array.isArray(updated.typical_occasions) ? updated.typical_occasions : [],
           city: updated.city,
-          profile_completed: updated.profile_completed,
+          profile_completed: Boolean(updated.profile_completed),
           updated_at: new Date().toISOString(),
         };
 
         if (gender) {
           profilePayload.gender = gender;
         }
+        if (bodyBuild) {
+          profilePayload.body_build = bodyBuild;
+        }
+        if (bodyScanConf !== undefined) {
+          profilePayload.body_scan_confidence = bodyScanConf;
+        }
+        if (skinScanConf !== undefined) {
+          profilePayload.skin_scan_confidence = skinScanConf;
+        }
 
-        let { data, error } = await supabaseAdmin
-          .from('profiles')
-          .upsert(profilePayload, { onConflict: 'user_id' })
-          .select('*')
-          .single();
+        let attempt = 0;
+        let profileSaveSuccess = false;
+        let lastError: any = null;
 
-        // If gender column is not yet present on profiles table, retry without gender
-        if (error && error.message && error.message.includes('gender') && error.message.includes('does not exist')) {
-          delete profilePayload.gender;
-          const retryRes = await supabaseAdmin
+        while (attempt < 5) {
+          attempt++;
+          const { data, error } = await supabaseAdmin
             .from('profiles')
             .upsert(profilePayload, { onConflict: 'user_id' })
             .select('*')
             .single();
-          data = retryRes.data;
-          error = retryRes.error;
+
+          if (!error) {
+            if (data) {
+              updated.id = data.id;
+            }
+            profileSaveSuccess = true;
+            break;
+          }
+
+          lastError = error;
+
+          const isMissingColumnError =
+            error.code === 'PGRST204' ||
+            (error.message && (
+              error.message.includes('in the schema cache') ||
+              error.message.includes('does not exist') ||
+              error.message.includes('column')
+            ));
+
+          if (isMissingColumnError) {
+            const match =
+              error.message.match(/Could not find the '([^']+)' column/i) ||
+              error.message.match(/column ["]?([a-zA-Z0-9_]+)["]? of relation/i) ||
+              error.message.match(/column ["]?([a-zA-Z0-9_]+)["]? does not exist/i);
+
+            const unknownCol = match ? match[1] : null;
+            if (unknownCol && unknownCol in profilePayload) {
+              console.warn(
+                `Database schema note: Column '${unknownCol}' not in public.profiles schema cache. Omitting from SQL row (persisted securely in auth user_metadata).`
+              );
+              delete profilePayload[unknownCol];
+              continue;
+            }
+
+            const extendedCols = ['gender', 'body_build', 'body_scan_confidence', 'skin_scan_confidence'];
+            let stripped = false;
+            for (const col of extendedCols) {
+              if (col in profilePayload && error.message.toLowerCase().includes(col)) {
+                console.warn(`Database schema note: Stripping non-schema column '${col}' from profiles upsert.`);
+                delete profilePayload[col];
+                stripped = true;
+              }
+            }
+            if (stripped) continue;
+          }
+
+          console.error('Supabase profiles.upsert unhandled error:', error);
+          break;
         }
 
-        if (error) {
-          console.error('Supabase profiles.upsert error:', error);
-          throw new Error(`Failed to save profile: ${error.message}`);
-        }
-
-        if (data) {
-          updated.id = data.id;
+        if (!profileSaveSuccess) {
+          throw new Error(`Failed to save profile: ${lastError?.message || 'Database write rejected'}`);
         }
       } catch (err: any) {
         console.error('CRITICAL: Supabase upsertUserProfile error:', err);

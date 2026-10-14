@@ -24,7 +24,7 @@ export default function DashboardLayout({
     try {
       const res = await fetch('/api/auth/me');
       if (res.status === 401) {
-        router.push('/login');
+        window.location.replace('/login');
         return;
       }
       if (!res.ok) {
@@ -38,21 +38,21 @@ export default function DashboardLayout({
       if (data.authenticated && data.user) {
         // Only redirect to onboarding if profile is explicitly incomplete
         if (data.profile_completed === false) {
-          router.push('/onboarding');
+          window.location.replace('/onboarding');
           return;
         }
 
         setUser(data.user);
+        setIsLoadingAuth(false);
       } else {
-        router.push('/login');
+        window.location.replace('/login');
       }
     } catch (err) {
       console.error('Session verify network error:', err);
       setAuthError('Connection issue communicating with AUREVÉ servers.');
-    } finally {
       setIsLoadingAuth(false);
     }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     loadSession();
