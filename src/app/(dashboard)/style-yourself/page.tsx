@@ -67,7 +67,7 @@ function StyleYourselfContent() {
   // Context State
   const [occasion, setOccasion] = useState<OccasionType>('Casual Outing');
   const [customOccasionText, setCustomOccasionText] = useState('');
-  const [city, setCity] = useState('Mumbai');
+  const [city, setCity] = useState('');
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
   // Active Category Tab in Wardrobe Selector
@@ -86,9 +86,9 @@ function StyleYourselfContent() {
     async function loadData() {
       setIsLoadingWardrobe(true);
       try {
-        const [wRes, weatherRes] = await Promise.all([
+        const [meRes, wRes] = await Promise.all([
+          fetch('/api/auth/me'),
           fetch('/api/wardrobe'),
-          fetch(`/api/weather?city=${encodeURIComponent(city)}`),
         ]);
 
         if (wRes.ok) {
@@ -96,6 +96,20 @@ function StyleYourselfContent() {
           setWardrobe(data.items || []);
         }
 
+        let resolvedCity = city;
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (meData.profile?.city) {
+            resolvedCity = meData.profile.city;
+            setCity(resolvedCity);
+          }
+        }
+        if (!resolvedCity) {
+          resolvedCity = 'Hyderabad';
+          setCity(resolvedCity);
+        }
+
+        const weatherRes = await fetch(`/api/weather?city=${encodeURIComponent(resolvedCity)}`);
         if (weatherRes.ok) {
           const wData = await weatherRes.json();
           setWeather(wData.weather);
@@ -107,7 +121,7 @@ function StyleYourselfContent() {
       }
     }
     loadData();
-  }, [city]);
+  }, []);
 
   // Wardrobe Items Filtered by Active Tab
   const tabItems = wardrobe.filter((item) => {

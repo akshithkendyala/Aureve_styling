@@ -215,6 +215,10 @@ export interface WardrobeItem {
 
 export interface WeatherData {
   city: string;
+  state?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
   temperature: number; // in Celsius
   feels_like?: number;
   condition: string; // "Clear", "Partly Cloudy", "Rain", "Humid", "Cool"
@@ -223,6 +227,9 @@ export interface WeatherData {
   wind_speed?: number; // km/h
   uv_index?: number;
   summary: string;
+  is_forecast?: boolean;
+  forecast_time?: string;
+  last_updated?: string;
 }
 
 export interface OutfitItemReference {

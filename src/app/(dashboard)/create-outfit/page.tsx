@@ -18,6 +18,8 @@ import {
   Mic,
   MicOff,
   X,
+  Droplets,
+  Wind,
 } from 'lucide-react';
 import {
   OccasionType,
@@ -29,6 +31,7 @@ import { POPULAR_INDIAN_CITIES } from '@/lib/weather/weatherService';
 import { OutfitResultCard } from '@/components/outfit/OutfitResultCard';
 import { AlternativeLooks } from '@/components/outfit/AlternativeLooks';
 import { FeedbackModal } from '@/components/outfit/FeedbackModal';
+import { LocationWeatherSelector } from '@/components/weather/LocationWeatherSelector';
 
 function CreateOutfitContent() {
   const searchParams = useSearchParams();
@@ -48,10 +51,22 @@ function CreateOutfitContent() {
     searchParams.get('date') || new Date().toISOString().split('T')[0]
   );
   const [time, setTime] = useState(searchParams.get('time') || '19:30');
-  const [city, setCity] = useState(searchParams.get('city') || 'Mumbai');
+  
+  // Location Hierarchy: 1. URL search param -> 2. Authenticated Profile (loaded on mount) -> 3. Device GPS -> 4. Manual fallback
+  const [city, setCity] = useState(searchParams.get('city') || '');
+  const [savedProfileCity, setSavedProfileCity] = useState<string | null>(null);
+  const [locationSource, setLocationSource] = useState<'profile' | 'geolocation' | 'manual'>(
+    searchParams.get('city') ? 'manual' : 'profile'
+  );
+  const [isLocating, setIsLocating] = useState(false);
+  const [geoMessage, setGeoMessage] = useState<{ type: 'info' | 'error' | 'success'; text: string } | null>(null);
+
   const [specialMode, setSpecialMode] = useState(searchParams.get('mode') || 'standard');
 
   const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [isWeatherLoading, setIsWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [loadingStage, setLoadingStage] = useState(0);
   const [generatedOutfit, setGeneratedOutfit] = useState<Outfit | null>(null);
@@ -143,21 +158,164 @@ function CreateOutfitContent() {
     }
   };
 
-  // Fetch weather when city changes
+  // Step 1: Resolve user's saved location from authenticated profile on mount
   useEffect(() => {
-    async function loadWeather() {
+    let isMounted = true;
+    async function loadUserProfileLocation() {
+      // If city was already explicitly specified in URL query params, respect it
+      if (searchParams.get('city')) return;
+
       try {
-        const res = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
+        const res = await fetch('/api/auth/me');
         if (res.ok) {
           const data = await res.json();
-          setWeather(data.weather);
+          const profileCity = data.profile?.city;
+          if (profileCity && isMounted) {
+            setCity(profileCity);
+            setSavedProfileCity(profileCity);
+            setLocationSource('profile');
+            return;
+          }
         }
       } catch (err) {
-        console.error(err);
+        console.warn('Could not load user profile location:', err);
+      }
+
+      // If no profile city exists, default to Hyderabad (never arbitrary Mumbai)
+      if (isMounted && !city) {
+        setCity('Hyderabad');
       }
     }
+
+    loadUserProfileLocation();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Step 2: Fetch weather for selected destination, date & time with immediate invalidation
+  useEffect(() => {
+    if (!city) return;
+    let isCancelled = false;
+
+    async function loadWeather() {
+      setIsWeatherLoading(true);
+      setWeatherError(null);
+
+      try {
+        const url = `/api/weather?city=${encodeURIComponent(city)}&date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}`;
+        const res = await fetch(url);
+        if (res.ok && !isCancelled) {
+          const data = await res.json();
+          if (data.weather) {
+            setWeather(data.weather);
+          } else {
+            setWeatherError(`Weather details currently limited for ${city}.`);
+          }
+        } else if (!isCancelled) {
+          setWeatherError(`Could not refresh weather for ${city}.`);
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          console.error('Weather load error:', err);
+          setWeatherError(`Unable to connect to weather service.`);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsWeatherLoading(false);
+        }
+      }
+    }
+
     loadWeather();
-  }, [city]);
+    return () => {
+      isCancelled = true;
+    };
+  }, [city, date, time]);
+
+  // Step 3: Professional Browser Geolocation Integration
+  const handleUseCurrentLocation = () => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setGeoMessage({
+        type: 'error',
+        text: 'Device geolocation is not supported in this browser. Please select your city manually.',
+      });
+      return;
+    }
+
+    setIsLocating(true);
+    setGeoMessage(null);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+
+          // Call reverse geocoding API route
+          const res = await fetch(`/api/weather?reverse=true&lat=${lat}&lon=${lon}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.location?.city) {
+              const detectedCity = data.location.city;
+              setCity(detectedCity);
+              setLocationSource('geolocation');
+              if (data.weather) {
+                setWeather(data.weather);
+                setIsWeatherLoading(false);
+              }
+              setGeoMessage({
+                type: 'success',
+                text: `Current location detected: ${detectedCity}${data.location.state ? `, ${data.location.state}` : ''}`,
+              });
+              return;
+            }
+          }
+
+          setGeoMessage({
+            type: 'error',
+            text: 'Could not resolve a specific city name from your GPS coordinates. Please select your city manually.',
+          });
+        } catch (err) {
+          setGeoMessage({
+            type: 'error',
+            text: 'Failed to reverse-geocode your coordinates. Please pick your city manually.',
+          });
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (geoErr) => {
+        setIsLocating(false);
+        if (geoErr.code === geoErr.PERMISSION_DENIED) {
+          setGeoMessage({
+            type: 'info',
+            text: 'Location permission was denied. You can select your city manually below, or enable location in your browser site permissions.',
+          });
+        } else if (geoErr.code === geoErr.POSITION_UNAVAILABLE) {
+          setGeoMessage({
+            type: 'error',
+            text: 'Location coordinates are temporarily unavailable from your device. Please choose your city manually.',
+          });
+        } else if (geoErr.code === geoErr.TIMEOUT) {
+          setGeoMessage({
+            type: 'error',
+            text: 'Device location request timed out. Please select your city manually.',
+          });
+        } else {
+          setGeoMessage({
+            type: 'error',
+            text: 'Could not retrieve device location. Please pick your city manually.',
+          });
+        }
+      },
+      {
+        timeout: 10000,
+        enableHighAccuracy: true,
+        maximumAge: 60000,
+      }
+    );
+  };
 
   // If occasion passed via query param, auto-generate outfit
   useEffect(() => {
@@ -296,15 +454,25 @@ function CreateOutfitContent() {
           </p>
         </div>
 
-        {weather && (
+        {weather && !isWeatherLoading && (
           <div className="flex items-center space-x-2.5 bg-white border border-[#EBE5DB] px-4 py-2 rounded-2xl shadow-xs self-start sm:self-auto">
             <CloudSun className="w-5 h-5 text-[#9A7B5F]" />
             <div>
               <span className="text-xs font-semibold text-[#18181B]">
                 {weather.city}: {weather.temperature}°C
               </span>
-              <p className="text-[10px] text-[#7E6047]">{weather.condition}</p>
+              <p className="text-[10px] text-[#7E6047]">
+                {weather.condition}
+                {weather.feels_like !== undefined && ` • Feels ${weather.feels_like}°C`}
+                {weather.is_forecast && ' (Forecast)'}
+              </p>
             </div>
+          </div>
+        )}
+        {isWeatherLoading && (
+          <div className="flex items-center space-x-2 bg-white border border-[#EBE5DB] px-4 py-2.5 rounded-2xl shadow-xs self-start sm:self-auto text-xs text-[#7E6047] animate-pulse">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#9A7B5F]" />
+            <span>Updating climate context…</span>
           </div>
         )}
       </div>
@@ -458,8 +626,8 @@ function CreateOutfitContent() {
           )}
         </div>
 
-        {/* Date, Time & City */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        {/* Date & Time of Outing */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-[#7E6047] mb-1">
               Date
@@ -489,27 +657,27 @@ function CreateOutfitContent() {
               />
             </div>
           </div>
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-[#7E6047] mb-1">
-              City / Weather
-            </label>
-            <div className="relative">
-              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9A7B5F]" />
-              <select
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
-              >
-                {POPULAR_INDIAN_CITIES.map((c) => (
-                  <option key={c.name} value={c.name}>
-                    {c.name} ({c.state})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
         </div>
+
+        {/* Intelligent Location & Real-Time Weather Intelligence */}
+        <LocationWeatherSelector
+          city={city}
+          onCityChange={(newCity) => {
+            setCity(newCity);
+            setLocationSource('manual');
+          }}
+          weather={weather}
+          isWeatherLoading={isWeatherLoading}
+          weatherError={weatherError}
+          savedProfileCity={savedProfileCity}
+          locationSource={locationSource}
+          onUseCurrentLocation={handleUseCurrentLocation}
+          isLocating={isLocating}
+          geoMessage={geoMessage}
+          onClearGeoMessage={() => setGeoMessage(null)}
+          date={date}
+          time={time}
+        />
 
         {/* Generate Button */}
         <div>

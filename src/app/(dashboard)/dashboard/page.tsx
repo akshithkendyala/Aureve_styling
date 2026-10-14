@@ -47,7 +47,7 @@ export default function DashboardPage() {
   const [customOccasion, setCustomOccasion] = useState('');
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [selectedTime, setSelectedTime] = useState('19:00');
-  const [selectedCity, setSelectedCity] = useState('Mumbai');
+  const [selectedCity, setSelectedCity] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Modals
@@ -96,6 +96,8 @@ export default function DashboardPage() {
         }
         if (meData.profile?.city) {
           setSelectedCity(meData.profile.city);
+        } else {
+          setSelectedCity((prev) => prev || 'Hyderabad');
         }
       }
 
@@ -134,11 +136,12 @@ export default function DashboardPage() {
     setIsGenerating(true);
 
     try {
+      const targetCity = selectedCity?.trim() || 'Hyderabad';
       const queryParams = new URLSearchParams({
         occasion: occ,
         date: selectedDate,
         time: selectedTime,
-        city: selectedCity,
+        city: targetCity,
         mode,
       });
 
@@ -341,6 +344,9 @@ export default function DashboardPage() {
                   onChange={(e) => setSelectedCity(e.target.value)}
                   className="w-full pl-10 pr-3.5 py-2.5 bg-[#FAF8F5] border border-[#EBE5DB] rounded-xl text-xs sm:text-sm font-medium text-[#18181B] focus:outline-none focus:border-[#18181B]"
                 >
+                  {selectedCity && !POPULAR_INDIAN_CITIES.some((c) => c.name.toLowerCase() === selectedCity.toLowerCase()) && (
+                    <option value={selectedCity}>{selectedCity} (Your Location)</option>
+                  )}
                   {POPULAR_INDIAN_CITIES.map((c) => (
                     <option key={c.name} value={c.name}>
                       {c.name} ({c.state})

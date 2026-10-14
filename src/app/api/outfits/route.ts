@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       interpreted_occasion: interpreted_occasion || null,
       date: date || new Date().toISOString().split('T')[0],
       time: time || '19:00',
-      location: location || 'Mumbai',
+      location: (location && String(location).trim()) || 'Your Location',
       weather_data,
       title,
       ai_explanation: ai_explanation || '',

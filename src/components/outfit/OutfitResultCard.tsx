@@ -64,11 +64,29 @@ export function OutfitResultCard({
 
         {/* Weather Context if available */}
         {outfit.weather_data && (
-          <div className="mt-4 inline-flex items-center space-x-2 text-xs text-[#5E4633] bg-[#F4EFEA] border border-[#E8DFD5] px-3 py-1.5 rounded-full">
-            <CloudSun className="w-3.5 h-3.5 text-[#9A7B5F]" />
-            <span>
-              {outfit.weather_data.city} • {outfit.weather_data.temperature}°C ({outfit.weather_data.condition})
-            </span>
+          <div className="mt-4 inline-flex flex-wrap items-center gap-2 text-xs text-[#5E4633] bg-[#F4EFEA] border border-[#E8DFD5] px-3.5 py-1.5 rounded-full">
+            <div className="flex items-center space-x-1.5 font-medium">
+              <CloudSun className="w-3.5 h-3.5 text-[#9A7B5F]" />
+              <span className="font-semibold text-[#18181B]">{outfit.weather_data.city}</span>
+              <span>•</span>
+              <span>{outfit.weather_data.temperature}°C</span>
+              <span className="text-[#7E6047]">({outfit.weather_data.condition})</span>
+            </div>
+            {outfit.weather_data.feels_like !== undefined && (
+              <span className="text-[11px] text-[#7E6047]">
+                • Feels {outfit.weather_data.feels_like}°C
+              </span>
+            )}
+            {outfit.weather_data.rain_probability !== undefined && outfit.weather_data.rain_probability > 0 && (
+              <span className="text-[11px] text-sky-700 font-medium">
+                • {outfit.weather_data.rain_probability}% Rain
+              </span>
+            )}
+            {outfit.weather_data.is_forecast && (
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                Forecast {outfit.weather_data.forecast_time ? `(${outfit.weather_data.forecast_time})` : ''}
+              </span>
+            )}
           </div>
         )}
       </div>

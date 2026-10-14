@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       customOccasionText,
       date,
       time,
-      location = 'Mumbai',
+      location,
       specialMode = 'standard',
     } = body;
 
@@ -43,8 +43,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fetch real-time weather for the designated location
-    const weather = await fetchWeatherData(location || profile?.city || 'Mumbai');
+    // Location Resolution: 1. Current outfit location from body -> 2. Saved profile city -> 3. Fallback
+    const resolvedLocation = (location && String(location).trim()) || profile?.city?.trim() || 'Hyderabad';
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetTime = time || '19:00';
+
+    // Fetch real-time weather or planned outing forecast for the designated location
+    const weather = await fetchWeatherData(resolvedLocation, { date: targetDate, time: targetTime });
 
     // Run AI Occasion Intelligence & Styling Engine with continuous feedback learning and custom occasion reasoning
     const outfitResult = await generateIntelligentOutfit({
@@ -53,9 +58,9 @@ export async function POST(req: NextRequest) {
       wardrobe,
       occasion,
       customOccasionText,
-      date: date || new Date().toISOString().split('T')[0],
-      time: time || '19:00',
-      location: location || profile?.city || 'Mumbai',
+      date: targetDate,
+      time: targetTime,
+      location: resolvedLocation,
       weather,
       previousOutfits,
       userFeedback,

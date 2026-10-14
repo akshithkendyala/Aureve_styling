@@ -18,7 +18,9 @@ export async function POST(req: NextRequest) {
       item_ids,
       occasion,
       customOccasionText,
-      location = 'Mumbai',
+      location,
+      date,
+      time,
     } = body;
 
     if (!item_ids || !Array.isArray(item_ids) || item_ids.length === 0) {
@@ -58,8 +60,11 @@ export async function POST(req: NextRequest) {
       selectedItems.push(item);
     }
 
+    // Location Resolution: 1. Body location -> 2. Profile city -> 3. Fallback
+    const resolvedLocation = (location && String(location).trim()) || profile?.city?.trim() || 'Hyderabad';
+
     // Fetch real-time weather if location available
-    const weather = await fetchWeatherData(location || profile?.city || 'Mumbai');
+    const weather = await fetchWeatherData(resolvedLocation, { date, time });
 
     // Build user's learned style profile
     const learnedProfile = buildLearnedStyleProfile(session.userId, userFeedback, previousOutfits, wardrobe);

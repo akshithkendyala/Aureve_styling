@@ -337,9 +337,21 @@ function generateRankedCandidates(
     })
   );
 
-  const isHot = (weather?.temperature || 28) >= 30;
-  const isCool = (weather?.temperature || 28) <= 22;
-  const isRain = (weather?.rain_probability || 0) > 40;
+  const temp = weather?.temperature ?? 28;
+  const humidity = weather?.humidity ?? 50;
+  const rainProb = weather?.rain_probability ?? 0;
+  const windSpeed = weather?.wind_speed ?? 10;
+  const isHot = temp >= 30;
+  const isVeryHot = temp >= 34;
+  const isCool = temp <= 22;
+  const isCold = temp <= 16;
+  const isRain =
+    rainProb >= 35 ||
+    (weather?.condition || '').toLowerCase().includes('rain') ||
+    (weather?.condition || '').toLowerCase().includes('shower') ||
+    (weather?.condition || '').toLowerCase().includes('drizzle');
+  const isHighHumidity = humidity >= 70 && temp >= 27;
+  const isWindy = windSpeed >= 20;
 
   const candidates: ScoredCombination[] = [];
 
@@ -391,6 +403,14 @@ function generateRankedCandidates(
         } else if (isSinglePiece) {
           // One-piece already carries complete outfit silhouette
           score += 13;
+        }
+
+        if (footwear) {
+          const footwearFormality = footwear.formality || 'Smart Casual';
+          if (rule.formalityLevels.includes(footwearFormality as any)) score += 10;
+          if (rule.key === 'interview' && (footwearFormality === 'Formal' || normalizeSubcategory(footwear.subcategory) === 'Formal Shoes')) {
+            score += 15; // High priority for formal shoes/Oxfords for interviews
+          }
         }
 
         // 1b. Preferred Occasion Subcategories (+35 max)
@@ -445,16 +465,54 @@ function generateRankedCandidates(
           }
         }
 
-        // 4. Weather Suitability (+10 / -15)
+        // 4. Enhanced Multi-Dimensional Weather Suitability
         if (isHot) {
-          if ((top.material || '').toLowerCase().includes('linen') || (top.material || '').toLowerCase().includes('cotton')) score += 6;
-          if (layer) score -= 15;
-        } else if (isCool) {
-          if (layer) score += 8;
+          const topMat = (top.material || '').toLowerCase();
+          if (topMat.includes('linen') || topMat.includes('cotton') || topMat.includes('modal') || topMat.includes('chambray')) score += 8;
+          if (layer && !rule.formalityLevels.includes('Formal')) score -= 15;
+          if (isVeryHot && layer) score -= 10;
+        } else if (isCold || isCool) {
+          const topSub = normalizeSubcategory(top.subcategory).toLowerCase();
+          const topMat = (top.material || '').toLowerCase();
+          const isWarmTop = topSub.includes('sweater') || topSub.includes('sweatshirt') || topSub.includes('pullover') || topMat.includes('wool') || topMat.includes('cashmere') || topMat.includes('fleece') || topMat.includes('knit');
+          const isBreezyTop = topMat.includes('linen') || topSub.includes('sleeveless');
+
+          if (isWarmTop) {
+            score += isCold ? 25 : 15; // Strong boost for warm knitwear/wool in cold weather
+          }
+          if (isBreezyTop) {
+            score -= isCold ? 25 : 12; // Heavy penalty for breezy linen in cold weather
+          }
+          if (layer) {
+            score += isCold ? 14 : 8;
+          } else if (!isSinglePiece && !isWarmTop && !rule.formalityLevels.includes('Formal')) {
+            score -= 10;
+          }
         }
 
-        if (isRain && bottom) {
-          if ((bottom.primary_color || '').toLowerCase().includes('white')) score -= 15;
+        if (isHighHumidity) {
+          const topFit = (top.fit || '').toLowerCase();
+          if (topFit.includes('relaxed') || topFit.includes('regular') || topFit.includes('oversized')) score += 5;
+        }
+
+        if (isRain) {
+          if (bottom) {
+            const bColor = (bottom.primary_color || '').toLowerCase();
+            const bMat = (bottom.material || '').toLowerCase();
+            if (bColor.includes('white') || bColor.includes('cream') || bColor.includes('ivory')) score -= 20; // mud/rain splatter risk
+            if (bMat.includes('silk') || bMat.includes('satin')) score -= 15;
+            if (bColor.includes('black') || bColor.includes('navy') || bColor.includes('charcoal') || bColor.includes('dark')) score += 6;
+          }
+          if (footwear) {
+            const fMat = (footwear.material || '').toLowerCase();
+            const fName = (footwear.name || '').toLowerCase();
+            if (fMat.includes('suede') || fName.includes('suede') || fMat.includes('canvas') || fName.includes('canvas')) score -= 15;
+            if (fMat.includes('leather') || fName.includes('leather') || fName.includes('boot')) score += 6;
+          }
+        }
+
+        if (isWindy && layer) {
+          score += 4;
         }
 
         // 5. Anti-Repetition Penalty (-40 for exact repeats)
@@ -558,9 +616,25 @@ function generateSmartExplanation(
   const bottomName = bottom?.name || '';
   const footwearStr = footwear ? ` anchored with ${footwear.name.toLowerCase()}` : '';
   const layerStr = layer ? ` structured with the ${layer.name.toLowerCase()}` : '';
-  const weatherStr = weather
-    ? ` In ${weather.city}'s ${weather.temperature}°C conditions, this selection balances breathability with sharp tailoring.`
-    : '';
+
+  let weatherStr = '';
+  if (weather) {
+    const locName = weather.city || 'your location';
+    const tempStr = `${weather.temperature}°C`;
+    const rainProb = weather.rain_probability || 0;
+    const cond = (weather.condition || '').toLowerCase();
+
+    if (rainProb >= 40 || cond.includes('rain') || cond.includes('shower') || cond.includes('drizzle')) {
+      weatherStr = ` Prepared for ${locName}'s rain (${rainProb}%), the cut and darker tones maintain composure against wet streets.`;
+    } else if (weather.temperature >= 32) {
+      weatherStr = ` In ${locName}'s ${tempStr} warmth with ${weather.humidity}% humidity, this breathable selection maximizes airflow and lightweight comfort.`;
+    } else if (weather.temperature <= 19) {
+      weatherStr = ` Calibrated for ${locName}'s ${tempStr} cool climate, this silhouette provides comfortable insulation without bulk.`;
+    } else {
+      weatherStr = ` In ${locName}'s pleasant ${tempStr} conditions, this selection balances breathability with sharp tailoring.`;
+    }
+  }
+
   const personalStr =
     personalReasons.length > 0 ? ` Reflecting your personal style preferences, this look ${personalReasons.join(' and ')}.` : '';
 
@@ -585,13 +659,14 @@ function generateSmartExplanation(
 
 /**
  * Intelligent Missing-Item Evaluation Engine
- * Returns a suggestion ONLY when an essential or styling gap genuinely exists for the occasion.
+ * Returns a suggestion ONLY when an essential or styling gap genuinely exists for the occasion or weather conditions.
  */
 export function evaluateMissingItem(
   wardrobe: WardrobeItem[],
   occasionKey: string,
   chosenTop: WardrobeItem,
-  chosenBottom?: WardrobeItem
+  chosenBottom?: WardrobeItem,
+  weather?: WeatherData | null
 ): MissingItemSuggestion | null {
   const activeItems = wardrobe.filter((i) => !i.is_archived);
 
@@ -610,6 +685,71 @@ export function evaluateMissingItem(
   const hasNameKeyword = (keyword: string) =>
     activeItems.some((it) => it.name.toLowerCase().includes(keyword.toLowerCase()));
 
+  // 1. Weather-driven suggestions (Rain, Cool, Extreme UV)
+  if (weather) {
+    const isRainy = (weather.rain_probability && weather.rain_probability > 40) || 
+      /rain|drizzle|shower|thunderstorm|monsoon/i.test(weather.condition || '');
+
+    if (isRainy) {
+      const hasRainwear =
+        hasSubcategory('layers', ['Rain Jacket', 'Trench Coat', 'Windbreaker']) ||
+        hasNameKeyword('rain') ||
+        hasNameKeyword('waterproof') ||
+        hasNameKeyword('trench');
+
+      if (!hasRainwear) {
+        return {
+          title: 'Monsoon / Rain Practicality',
+          suggested_item: 'Lightweight Water-Resistant Jacket or Trench',
+          reason: `With ${weather.rain_probability ?? 'elevated'}% rain probability expected in ${weather.city}, adding a water-resistant layer ensures practical comfort without dampening your aesthetic.`,
+          why_it_works: `Drapes effortlessly over your ${chosenTop.name} and protects clean fabrics from moisture and splashes.`,
+          category: 'layers',
+          priority: 'recommended',
+        };
+      }
+    }
+
+    const isCold = (weather.temperature && weather.temperature < 19) || 
+      (weather.feels_like && weather.feels_like < 19);
+
+    if (isCold) {
+      const hasLayersOrKnit =
+        hasSubcategory('layers', ['Jacket', 'Blazer', 'Sweater', 'Cardigan', 'Overcoat', 'Hoodie', 'Coat']) ||
+        hasSubcategory('tops', ['Sweater', 'Sweatshirt', 'Pullover']);
+
+      if (!hasLayersOrKnit) {
+        return {
+          title: 'Climate Layering Essential',
+          suggested_item: 'Fine Merino Knit or Tailored Overlayer',
+          reason: `Cooler conditions (${weather.temperature}°C) in ${weather.city} benefit from structured, refined thermal layering.`,
+          why_it_works: `Provides warmth without bulk while introducing textural depth over your ${chosenTop.name}.`,
+          category: 'layers',
+          priority: 'recommended',
+        };
+      }
+    }
+
+    const isHighUV = (weather.uv_index && weather.uv_index >= 8) && (weather.temperature && weather.temperature >= 30);
+    if (isHighUV) {
+      const hasSunProtection =
+        hasSubcategory('accessories', ['Sunglasses', 'Sun Hat']) ||
+        hasNameKeyword('sunglasses') ||
+        hasNameKeyword('shades');
+
+      if (!hasSunProtection) {
+        return {
+          title: 'Daylight UV Protection',
+          suggested_item: 'UV-Protected Acetate Sunglasses',
+          reason: `High UV index (${weather.uv_index}) in ${weather.city} requires essential eye and facial sun protection during daytime outings.`,
+          why_it_works: `Adds an instant high-fashion finish to daytime silhouettes while shielding from intense sun glare.`,
+          category: 'accessories',
+          priority: 'recommended',
+        };
+      }
+    }
+  }
+
+  // 2. Occasion-driven wardrobe gap suggestions
   if (occasionKey === 'party') {
     const hasPartyShirt =
       hasNameKeyword('party') ||
@@ -711,7 +851,7 @@ export async function generateIntelligentOutfit(
     customOccasionText,
     date,
     time = '19:00',
-    location = 'Mumbai',
+    location = '',
     weather,
     previousOutfits = [],
     userFeedback = [],
@@ -803,6 +943,27 @@ export async function generateIntelligentOutfit(
       const bottomOptionsForPrompt = validBottoms.slice(0, 8);
       const footwearOptionsForPrompt = validFootwear.slice(0, 6);
 
+      const weatherContext = weather
+        ? `Location: ${weather.city}${weather.state ? `, ${weather.state}` : ''}${weather.country ? `, ${weather.country}` : ''}
+- Temperature: ${weather.temperature}°C (Feels like ${weather.feels_like}°C)
+- Condition: ${weather.condition}
+- Humidity: ${weather.humidity}%
+- Rain Probability: ${weather.rain_probability}%
+- Wind Speed: ${weather.wind_speed} km/h
+- UV Index: ${weather.uv_index}
+- Time of Weather: ${weather.is_forecast ? `Forecast for ${weather.forecast_time}` : 'Current live conditions'}`
+        : 'Pleasant & mild conditions (approx 26°C)';
+
+      const climateDirectives = weather
+        ? [
+            (weather.temperature !== undefined && weather.temperature >= 32) ? '• HEAT/SUMMER: Prioritize breathable fabrics (cotton/linen), lighter weaves, and avoid unnecessary heavy layers.' : '',
+            ((weather.rain_probability !== undefined && weather.rain_probability > 40) || /rain|drizzle|shower|thunderstorm|monsoon/i.test(weather.condition || '')) ? '• MONSOON/RAIN: Favor practical footwear, avoid easily stained white canvas bottoms or delicate suede. Prefer clean dark tones or ankle-length cuts.' : '',
+            (weather.temperature !== undefined && weather.temperature <= 19) ? '• COOL/CHILLY: Incorporate elegant layering, knitwear, or structured jackets if available in the selected pieces.' : '',
+            (weather.humidity !== undefined && weather.humidity >= 70) ? '• HIGH HUMIDITY: Favor airy cuts and natural breathable fibers for maximum all-day comfort.' : '',
+            (weather.uv_index !== undefined && weather.uv_index >= 8) ? '• HIGH UV: Consider sun-smart styling and daytime eye protection if outdoor.' : '',
+          ].filter(Boolean).join('\n')
+        : '• Balanced standard styling.';
+
       const promptText = `
 You are AUREVÉ's master Indian personal fashion stylist.
 OCCASION: "${rule.name}" (${rule.description})
@@ -813,7 +974,9 @@ STRICT OCCASION RULES:
         ...rule.forbiddenBottomSubcategories,
         ...rule.forbiddenFootwearSubcategories,
       ].join(', ')}.
-- Weather Context: ${weather ? `${weather.city}, ${weather.temperature}°C, ${weather.condition}` : '28°C pleasant'}.
+- Weather & Outing Context:
+${weatherContext}
+${climateDirectives}
 - User Profile: Skin Undertone: ${userProfile?.skin_tone || 'Warm Neutral'}, Body Build: ${userProfile?.body_build || 'Proportional'}, Preferred Fit: ${userProfile?.preferred_fit || 'Regular'}.
 
 ALLOWED USER WARDROBE PIECES:
@@ -828,27 +991,32 @@ ${footwearOptionsForPrompt.map((f) => `- ID: "${f.id}" | Name: "${f.name}" | Col
 
 MANDATORY INSTRUCTIONS:
 1. Select the most elegant, occasion-appropriate Top ID, Bottom ID (or null if the Top is a one-piece outfit like Dress, Saree, Jumpsuit, Anarkali), and Footwear ID from the lists above.
-2. Consider the user's skin undertone (${userProfile?.skin_tone || 'Warm Neutral'}) for color contrast near the face, and body build (${userProfile?.body_build || 'Proportional'}) for balanced visual silhouette proportions.
-3. For PARTY, select stylish modern tops/dresses/shirts with clean jeans/chinos/skirts and sleek footwear. NEVER select informal Kurta or Sandals.
-4. For INTERVIEW, select formal shirts/blouses, tailored trousers/skirts, and formal shoes. NEVER select sneakers or t-shirts.
-5. Return STRICT JSON:
+2. Ensure the combination respects the local weather (${weather?.city || 'local'}, ${weather?.temperature ?? 28}°C, ${weather?.condition || 'clear'}) while strictly upholding occasion formality.
+3. Consider the user's skin undertone (${userProfile?.skin_tone || 'Warm Neutral'}) for color contrast near the face, and body build (${userProfile?.body_build || 'Proportional'}) for balanced visual silhouette proportions.
+4. For PARTY, select stylish modern tops/dresses/shirts with clean jeans/chinos/skirts and sleek footwear. NEVER select informal Kurta or Sandals.
+5. For INTERVIEW, select formal shirts/blouses, tailored trousers/skirts, and formal shoes. NEVER select sneakers or t-shirts.
+6. Return STRICT JSON:
 {
   "title": "Editorial title (e.g., Modern Night-Out Styling)",
   "selected_top_id": "EXACT_ID_FROM_TOPS",
   "selected_bottom_id": "EXACT_ID_FROM_BOTTOMS_OR_NULL",
   "selected_footwear_id": "EXACT_ID_FROM_FOOTWEAR",
   "style_direction": ["Modern", "Classy", "Confident"],
-  "ai_explanation": "2 concise sentences explaining why this exact combination works beautifully for this real-world occasion and flatters the user's undertone/proportions."
+  "ai_explanation": "2 concise sentences explaining why this exact combination works beautifully for this real-world occasion, suits the local climate (${weather?.city || 'local'}), and flatters the user's undertone/proportions."
 }
 `;
 
-      const modelCandidates = [
-        'gemini-3.5-flash-lite',
-        'gemini-2.5-flash',
-        'gemini-3.5-flash',
-        'gemini-3.1-flash-lite',
-        'gemini-3.8-flash',
-      ];
+      const preferredModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+      const modelCandidates = Array.from(
+        new Set([
+          preferredModel,
+          'gemini-3.8-flash',
+          'gemini-2.5-flash',
+          'gemini-3.5-flash',
+          'gemini-3.5-flash-lite',
+          'gemini-3.1-flash-lite',
+        ])
+      );
 
       for (const model of modelCandidates) {
         try {
@@ -937,7 +1105,8 @@ MANDATORY INSTRUCTIONS:
     wardrobe,
     rule.key,
     finalLook.top,
-    finalLook.bottom
+    finalLook.bottom,
+    weather
   );
 
   return {
