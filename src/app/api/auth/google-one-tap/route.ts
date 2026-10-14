@@ -153,19 +153,20 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 3. Issue signed JWT session cookie for instant session restoration
+    // 3. Retrieve profile to determine single source of truth for onboarding & session
+    const profile = await Repository.getUserProfile(userId);
+    const isProfileCompleted = Boolean(profile?.profile_completed);
+
+    // 4. Issue signed JWT session cookie with daily expiration policy and profile completion status
     const sessionToken = await createSessionToken({
       userId,
       email,
       name: syncedUser.name || displayName,
       avatarUrl,
       mobile: syncedUser.mobile_number || '',
+      profileCompleted: isProfileCompleted,
     });
     await setSessionCookie(sessionToken);
-
-    // 4. Retrieve profile to determine single source of truth for onboarding
-    const profile = await Repository.getUserProfile(userId);
-    const isProfileCompleted = Boolean(profile?.profile_completed);
 
     return NextResponse.json({
       success: true,

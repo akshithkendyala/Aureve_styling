@@ -17,7 +17,15 @@ export async function POST() {
     // 2. Clear JWT session cookie
     await removeSessionCookie();
 
-    return NextResponse.json({ success: true, message: 'Logged out successfully' });
+    const response = NextResponse.json({ success: true, message: 'Logged out successfully' });
+    response.cookies.set('aureve_session', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 0,
+      path: '/',
+    });
+    return response;
   } catch (error) {
     console.error('Logout error:', error);
     return NextResponse.json({ error: 'Failed to logout' }, { status: 500 });

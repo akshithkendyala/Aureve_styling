@@ -42,7 +42,11 @@ export async function GET(request: Request) {
         // Sync or initialize user in public.users and public.profiles
         await Repository.syncUserFromAuth(authUser);
 
-        // Also create our backup signed session cookie to guarantee session resilience
+        // Check if user has already completed onboarding
+        const profile = await Repository.getUserProfile(authUser.id);
+        const isProfileCompleted = Boolean(profile?.profile_completed);
+
+        // Also create our daily signed session cookie to guarantee session resilience
         try {
           const token = await createSessionToken({
             userId: authUser.id,
@@ -54,16 +58,14 @@ export async function GET(request: Request) {
               'Member',
             mobile: authUser.user_metadata?.mobile_number || '',
             avatarUrl: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || '',
+            profileCompleted: isProfileCompleted,
           });
           await setSessionCookie(token);
         } catch (cookieErr) {
           console.warn('Set fallback cookie error:', cookieErr);
         }
 
-        // Check if user has already completed onboarding
-        const profile = await Repository.getUserProfile(authUser.id);
-
-        if (profile && profile.profile_completed === true) {
+        if (isProfileCompleted) {
           return NextResponse.redirect(`${origin}/dashboard`);
         } else {
           return NextResponse.redirect(`${origin}/onboarding`);

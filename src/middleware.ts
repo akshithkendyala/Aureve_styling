@@ -51,25 +51,21 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Also check fallback JWT cookie
-  if (!user) {
-    const fallbackCookie = request.cookies.get('aureve_session')?.value;
-    if (fallbackCookie) {
-      const payload = await verifySessionToken(fallbackCookie);
-      if (payload?.userId) {
-        user = { id: payload.userId } as any;
-      }
+  // Extract fallback JWT cookie payload
+  let sessionPayload: any = null;
+  const fallbackCookie = request.cookies.get('aureve_session')?.value;
+  if (fallbackCookie) {
+    sessionPayload = await verifySessionToken(fallbackCookie);
+    if (sessionPayload?.userId && !user) {
+      user = { id: sessionPayload.userId } as any;
     }
   }
 
   const pathname = request.nextUrl.pathname;
   const isAuthRoute = pathname === '/login';
-  const isCallbackRoute = pathname.startsWith('/auth/callback');
-  const isApiRoute = pathname.startsWith('/api');
-  const isPublicAsset =
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon.ico') ||
-    pathname.match(/\.(svg|png|jpg|jpeg|gif|webp)$/);
+  const isRootRoute = pathname === '/';
+  const isLandingQuery = request.nextUrl.searchParams.get('landing') === 'true';
+  const isOnboardingRoute = pathname.startsWith('/onboarding');
 
   // Protect internal dashboard & onboarding routes
   const isProtectedRoute =
@@ -80,17 +76,33 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/style-profile') ||
     pathname.startsWith('/style-yourself') ||
     pathname.startsWith('/settings') ||
-    pathname.startsWith('/onboarding');
+    isOnboardingRoute;
 
+  // Unauthenticated user attempting to access protected route -> redirect to login
   if (isProtectedRoute && !user) {
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);
   }
 
-  // If already logged in and visiting login page, redirect
-  if (isAuthRoute && user) {
+  // Authenticated user with completed profile visiting onboarding -> redirect to dashboard
+  if (isOnboardingRoute && user && sessionPayload?.profileCompleted === true) {
     const dashboardUrl = new URL('/dashboard', request.url);
     return NextResponse.redirect(dashboardUrl);
+  }
+
+  // Authenticated user visiting /login -> redirect directly to dashboard (or onboarding if incomplete)
+  if (isAuthRoute && user) {
+    const target = sessionPayload?.profileCompleted === false ? '/onboarding' : '/dashboard';
+    const redirectUrl = new URL(target, request.url);
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  // Authenticated user reopening root / -> redirect directly to dashboard (or onboarding)
+  // unless explicitly requesting marketing landing page with ?landing=true
+  if (isRootRoute && user && !isLandingQuery) {
+    const target = sessionPayload?.profileCompleted === false ? '/onboarding' : '/dashboard';
+    const redirectUrl = new URL(target, request.url);
+    return NextResponse.redirect(redirectUrl);
   }
 
   return response;

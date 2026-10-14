@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionUser } from '@/lib/auth/session';
+import { getSessionUser, createSessionToken, setSessionCookie } from '@/lib/auth/session';
 import { Repository } from '@/lib/db/repository';
 import { isValidIndianMobile, normalizeMobileNumber } from '@/lib/auth/mobile';
 
@@ -220,6 +220,21 @@ export async function PUT(req: NextRequest) {
     }
 
     const updatedProfile = await Repository.upsertUserProfile(session.userId, updates);
+
+    // Refresh session cookie with profile completion and updated details
+    try {
+      const refreshedToken = await createSessionToken({
+        userId: session.userId,
+        email: session.email,
+        name: updatedProfile.name || session.name,
+        avatarUrl: session.avatarUrl,
+        mobile: updatedProfile.mobile_number || session.mobile,
+        profileCompleted: Boolean(updatedProfile.profile_completed),
+      });
+      await setSessionCookie(refreshedToken);
+    } catch (refErr) {
+      console.warn('Refresh session cookie note:', refErr);
+    }
 
     return NextResponse.json({ success: true, profile: updatedProfile });
   } catch (error: any) {

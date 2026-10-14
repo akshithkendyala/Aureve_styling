@@ -18,6 +18,31 @@ import {
 import { GoogleOneTap } from '@/components/auth/GoogleOneTap';
 
 export default function LandingPage() {
+  React.useEffect(() => {
+    // If user explicitly navigated with ?landing=true, keep them on marketing landing
+    if (typeof window !== 'undefined' && window.location.search.includes('landing=true')) {
+      return;
+    }
+    let isCancelled = false;
+    async function checkExistingAuth() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authenticated && !isCancelled) {
+            window.location.replace(data.profile_completed ? '/dashboard' : '/onboarding');
+          }
+        }
+      } catch {
+        // Ignore network check failure on public landing
+      }
+    }
+    checkExistingAuth();
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#FBF9F6] text-[#18181B] selection:bg-[#221A13] selection:text-[#FAF8F5]">
       {/* Google One Tap integration */}

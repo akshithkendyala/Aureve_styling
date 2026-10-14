@@ -43,6 +43,7 @@ interface GoogleOneTapProps {
 export function GoogleOneTap({ onSuccess, onError }: GoogleOneTapProps) {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   const isInitializedRef = useRef(false);
 
   const googleClientId =
@@ -50,7 +51,7 @@ export function GoogleOneTap({ onSuccess, onError }: GoogleOneTapProps) {
     '573479877652-rscpbk208vp988s4s5asud0aalm1j3i3.apps.googleusercontent.com';
 
   useEffect(() => {
-    // If user is already authenticated, do not show Google One Tap
+    // If user is already authenticated, strictly prevent Google One Tap from prompting
     let isCancelled = false;
     async function checkAuth() {
       try {
@@ -58,11 +59,21 @@ export function GoogleOneTap({ onSuccess, onError }: GoogleOneTapProps) {
         if (res.ok) {
           const data = await res.json();
           if (data.authenticated && !isCancelled) {
-            isInitializedRef.current = true; // Mark as already authenticated
+            setAuthStatus('authenticated');
+            isInitializedRef.current = true;
+            if (typeof window !== 'undefined' && window.google?.accounts?.id) {
+              try {
+                window.google.accounts.id.cancel();
+              } catch {}
+            }
+            return;
           }
         }
       } catch {
         // Ignore check error
+      }
+      if (!isCancelled) {
+        setAuthStatus('unauthenticated');
       }
     }
     checkAuth();
@@ -158,10 +169,15 @@ export function GoogleOneTap({ onSuccess, onError }: GoogleOneTapProps) {
   }, [googleClientId]);
 
   useEffect(() => {
-    if (scriptLoaded) {
+    if (scriptLoaded && authStatus === 'unauthenticated') {
       initOneTap();
     }
-  }, [scriptLoaded, initOneTap]);
+  }, [scriptLoaded, authStatus, initOneTap]);
+
+  // If already authenticated, do not mount Google client script or prompt UI
+  if (authStatus === 'authenticated') {
+    return null;
+  }
 
   return (
     <>
