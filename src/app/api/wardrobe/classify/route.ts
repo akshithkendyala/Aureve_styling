@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
 import { classifyClothingImage } from '@/lib/ai/visionClassifier';
+import { suggestCollectionsForItem } from '@/lib/ai/collectionClassifier';
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +18,15 @@ export async function POST(req: NextRequest) {
     }
 
     const classification = await classifyClothingImage(image, hint, clientColorHint);
-    return NextResponse.json({ success: true, classification });
+    const suggestedCollections = suggestCollectionsForItem(classification);
+
+    return NextResponse.json({
+      success: true,
+      classification: {
+        ...classification,
+        suggested_collections: suggestedCollections,
+      },
+    });
   } catch (error) {
     console.error('AI clothing classification error:', error);
     return NextResponse.json({ error: 'Failed to classify clothing piece' }, { status: 500 });

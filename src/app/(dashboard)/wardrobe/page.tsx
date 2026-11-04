@@ -7,12 +7,15 @@ import { CategoryNav } from '@/components/wardrobe/CategoryNav';
 import { WardrobeGrid } from '@/components/wardrobe/WardrobeGrid';
 import { AddClothingModal } from '@/components/wardrobe/AddClothingModal';
 import { ItemDetailModal } from '@/components/wardrobe/ItemDetailModal';
-import { Plus, Trash2, AlertTriangle, Loader2, X } from 'lucide-react';
+import { CollectionsSection } from '@/components/wardrobe/CollectionsSection';
+import { Plus, Trash2, AlertTriangle, Loader2, X, Sparkles, FolderHeart } from 'lucide-react';
 
 export default function WardrobePage() {
   const searchParams = useSearchParams();
   const initialCat = searchParams.get('category') || 'all';
+  const initialTab = searchParams.get('tab') === 'collections' ? 'collections' : 'wardrobe';
 
+  const [mainView, setMainView] = useState<'wardrobe' | 'collections'>(initialTab);
   const [items, setItems] = useState<WardrobeItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCat);
   const [isLoading, setIsLoading] = useState(true);
@@ -266,7 +269,32 @@ export default function WardrobePage() {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2.5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          {/* Main View Switcher: All Items vs My Collections */}
+          <div className="inline-flex p-1 rounded-2xl bg-[#F4EFEA] border border-[#E8DFD5]">
+            <button
+              onClick={() => setMainView('wardrobe')}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                mainView === 'wardrobe'
+                  ? 'bg-[#18181B] text-[#FAF8F5] shadow-xs'
+                  : 'text-[#7E6047] hover:text-[#18181B]'
+              }`}
+            >
+              All Items ({counts.all})
+            </button>
+            <button
+              onClick={() => setMainView('collections')}
+              className={`inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                mainView === 'collections'
+                  ? 'bg-[#18181B] text-[#FAF8F5] shadow-xs'
+                  : 'text-[#7E6047] hover:text-[#18181B]'
+              }`}
+            >
+              <FolderHeart className="w-3.5 h-3.5" />
+              <span>My Collections</span>
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => setIsAddModalOpen(true)}
@@ -278,32 +306,42 @@ export default function WardrobePage() {
         </div>
       </div>
 
-      {/* Category Tabs / Chips */}
-      <CategoryNav
-        selectedCategory={selectedCategory}
-        onSelectCategory={setSelectedCategory}
-        counts={counts}
-      />
+      {mainView === 'collections' ? (
+        <CollectionsSection
+          wardrobeItems={items}
+          onOpenItemDetail={(it) => setActiveDetailItem(it)}
+          onRefreshWardrobe={fetchItems}
+        />
+      ) : (
+        <>
+          {/* Category Tabs / Chips */}
+          <CategoryNav
+            selectedCategory={selectedCategory}
+            onSelectCategory={setSelectedCategory}
+            counts={counts}
+          />
 
-      {/* Garments Grid */}
-      <WardrobeGrid
-        items={displayedItems}
-        isLoading={isLoading}
-        onSelectItem={(it) => setActiveDetailItem(it)}
-        onToggleFavorite={handleToggleFavorite}
-        onArchive={handleArchive}
-        onDelete={promptDeleteSingle}
-        onOpenAddModal={() => setIsAddModalOpen(true)}
-        onSeedDemoWardrobe={handleSeedStarterWardrobe}
-        selectedIds={selectedIds}
-        onToggleSelect={handleToggleSelect}
-        isSelectionMode={isSelectionMode}
-        setIsSelectionMode={setIsSelectionMode}
-        onSelectAll={handleSelectAll}
-        onDeselectAll={handleDeselectAll}
-        onDeleteSelected={promptDeleteSelected}
-        onDeleteAll={items.length > 0 ? promptDeleteAll : undefined}
-      />
+          {/* Garments Grid */}
+          <WardrobeGrid
+            items={displayedItems}
+            isLoading={isLoading}
+            onSelectItem={(it) => setActiveDetailItem(it)}
+            onToggleFavorite={handleToggleFavorite}
+            onArchive={handleArchive}
+            onDelete={promptDeleteSingle}
+            onOpenAddModal={() => setIsAddModalOpen(true)}
+            onSeedDemoWardrobe={handleSeedStarterWardrobe}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
+            isSelectionMode={isSelectionMode}
+            setIsSelectionMode={setIsSelectionMode}
+            onSelectAll={handleSelectAll}
+            onDeselectAll={handleDeselectAll}
+            onDeleteSelected={promptDeleteSelected}
+            onDeleteAll={items.length > 0 ? promptDeleteAll : undefined}
+          />
+        </>
+      )}
 
       {/* Add Modal */}
       <AddClothingModal

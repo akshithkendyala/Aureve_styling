@@ -117,6 +117,37 @@ create table if not exists public.outfit_feedback (
 create index if not exists idx_outfit_feedback_user_id on public.outfit_feedback(user_id);
 create index if not exists idx_outfit_feedback_outfit_id on public.outfit_feedback(outfit_id);
 
+-- 7. WARDROBE COLLECTIONS TABLE (Strict user isolation by user_id)
+create table if not exists public.wardrobe_collections (
+    id uuid primary key default uuid_generate_v4(),
+    user_id uuid not null,
+    name text not null,
+    slug text not null,
+    description text,
+    collection_type text not null default 'custom', -- 'system' | 'custom'
+    icon text not null default 'FolderHeart',
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+    updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+    constraint unique_user_collection_name unique (user_id, name)
+);
+
+create index if not exists idx_wardrobe_collections_user_id on public.wardrobe_collections(user_id);
+create index if not exists idx_wardrobe_collections_slug on public.wardrobe_collections(user_id, slug);
+
+-- 8. WARDROBE COLLECTION ITEMS (JUNCTION TABLE)
+create table if not exists public.wardrobe_collection_items (
+    id uuid primary key default uuid_generate_v4(),
+    collection_id uuid references public.wardrobe_collections(id) on delete cascade not null,
+    wardrobe_item_id uuid references public.wardrobe_items(id) on delete cascade not null,
+    user_id uuid not null,
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+    constraint unique_collection_item unique (collection_id, wardrobe_item_id)
+);
+
+create index if not exists idx_wardrobe_collection_items_col_id on public.wardrobe_collection_items(collection_id);
+create index if not exists idx_wardrobe_collection_items_item_id on public.wardrobe_collection_items(wardrobe_item_id);
+create index if not exists idx_wardrobe_collection_items_user_id on public.wardrobe_collection_items(user_id);
+
 -- ENABLE ROW LEVEL SECURITY
 alter table public.users enable row level security;
 alter table public.profiles enable row level security;
@@ -124,6 +155,8 @@ alter table public.wardrobe_items enable row level security;
 alter table public.outfits enable row level security;
 alter table public.outfit_items enable row level security;
 alter table public.outfit_feedback enable row level security;
+alter table public.wardrobe_collections enable row level security;
+alter table public.wardrobe_collection_items enable row level security;
 
 -- ROW LEVEL SECURITY POLICIES
 -- Drop existing policies if any to avoid errors on rerun
@@ -133,6 +166,8 @@ drop policy if exists "Allow operations on wardrobe_items" on public.wardrobe_it
 drop policy if exists "Allow operations on outfits" on public.outfits;
 drop policy if exists "Allow operations on outfit_items" on public.outfit_items;
 drop policy if exists "Allow operations on outfit_feedback" on public.outfit_feedback;
+drop policy if exists "Allow operations on wardrobe_collections" on public.wardrobe_collections;
+drop policy if exists "Allow operations on wardrobe_collection_items" on public.wardrobe_collection_items;
 
 create policy "Allow operations on users" on public.users for all using (true) with check (true);
 create policy "Allow operations on profiles" on public.profiles for all using (true) with check (true);
@@ -140,3 +175,5 @@ create policy "Allow operations on wardrobe_items" on public.wardrobe_items for 
 create policy "Allow operations on outfits" on public.outfits for all using (true) with check (true);
 create policy "Allow operations on outfit_items" on public.outfit_items for all using (true) with check (true);
 create policy "Allow operations on outfit_feedback" on public.outfit_feedback for all using (true) with check (true);
+create policy "Allow operations on wardrobe_collections" on public.wardrobe_collections for all using (true) with check (true);
+create policy "Allow operations on wardrobe_collection_items" on public.wardrobe_collection_items for all using (true) with check (true);

@@ -29,12 +29,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const updates = await req.json();
+
+    if (Array.isArray(updates.collection_ids)) {
+      await Repository.setItemCollections(session.userId, params.id, updates.collection_ids);
+    }
+
     const updated = await Repository.updateWardrobeItem(session.userId, params.id, updates);
     if (!updated) {
       return NextResponse.json({ error: 'Item not found or could not be updated' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, item: updated });
+    const assignedCollections = await Repository.getItemCollectionIds(session.userId, params.id);
+    const enrichedItem = { ...updated, collection_ids: assignedCollections };
+
+    return NextResponse.json({ success: true, item: enrichedItem });
   } catch (error) {
     console.error('Update wardrobe item error:', error);
     return NextResponse.json({ error: 'Failed to update item' }, { status: 500 });

@@ -40,6 +40,10 @@ function CreateOutfitContent() {
   const [occasion, setOccasion] = useState<OccasionType>(
     (searchParams.get('occasion') as OccasionType) || 'Date'
   );
+  const [selectedCollection, setSelectedCollection] = useState<string>(
+    searchParams.get('collection') || 'all'
+  );
+  const [userCollections, setUserCollections] = useState<any[]>([]);
   const [customOccasionText, setCustomOccasionText] = useState(
     searchParams.get('custom') || ''
   );
@@ -90,6 +94,51 @@ function CreateOutfitContent() {
     { label: 'Gym', emoji: '🏃' },
     { label: 'Home', emoji: '🛋️' },
   ];
+
+  useEffect(() => {
+    async function loadCollections() {
+      try {
+        const res = await fetch('/api/collections');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.collections) setUserCollections(data.collections);
+        }
+      } catch (e) {
+        // Ignore
+      }
+    }
+    loadCollections();
+  }, []);
+
+  const collectionOptions = [
+    { slug: 'all', name: 'All Collections', emoji: '✨' },
+    { slug: 'everyday', name: 'Everyday', emoji: '☀️' },
+    { slug: 'college_work', name: 'College & Work', emoji: '💼' },
+    { slug: 'traditional_festive', name: 'Traditional & Festive', emoji: '🪔' },
+    { slug: 'party_occasions', name: 'Party & Occasions', emoji: '✨' },
+    { slug: 'home_comfort', name: 'Home & Comfort', emoji: '🛋️' },
+    { slug: 'outdoor_travel', name: 'Outdoor & Travel', emoji: '✈️' },
+    ...userCollections
+      .filter((c: any) => c.collection_type === 'custom')
+      .map((c: any) => ({ slug: c.slug, name: c.name, emoji: '📁' })),
+  ];
+
+  const detectedConflict = React.useMemo(() => {
+    if (selectedCollection === 'all') return null;
+    const col = selectedCollection.toLowerCase();
+    const occ = occasion.toLowerCase();
+    if (col.includes('home') || col.includes('comfort')) {
+      if (['interview', 'office', 'wedding', 'party', 'dinner', 'date'].includes(occ)) {
+        return `Stylist Observation: You selected "Home & Comfort" for a ${occasion} event. Loungewear pieces generally do not meet formal dress codes. AUREVÉ will prioritize appropriate pieces or you can select "College & Work".`;
+      }
+    }
+    if (col.includes('traditional') || col.includes('festive')) {
+      if (occ === 'gym') {
+        return `Stylist Observation: "Traditional & Festive" attire is not suitable for athletic Gym workouts.`;
+      }
+    }
+    return null;
+  }, [selectedCollection, occasion]);
 
   const loadingMessages = [
     'Analyzing your active wardrobe…',
@@ -343,6 +392,7 @@ function CreateOutfitContent() {
         body: JSON.stringify({
           occasion,
           customOccasionText: customOccasionText.trim() || undefined,
+          collection: selectedCollection !== 'all' ? selectedCollection : undefined,
           date,
           time,
           location: city,
@@ -387,6 +437,10 @@ function CreateOutfitContent() {
           occasion: outfitToSave.occasion,
           custom_occasion_text: outfitToSave.custom_occasion_text,
           interpreted_occasion: outfitToSave.interpreted_occasion,
+          collection: outfitToSave.collection,
+          collection_id: outfitToSave.collection_id,
+          wardrobe_completeness: outfitToSave.wardrobe_completeness,
+          conflict_note: outfitToSave.conflict_note,
           date: outfitToSave.date,
           time: outfitToSave.time,
           location: outfitToSave.location,
@@ -396,6 +450,8 @@ function CreateOutfitContent() {
           style_match: outfitToSave.style_match,
           style_direction: outfitToSave.style_direction,
           items: outfitToSave.items,
+          recommended_missing_items: outfitToSave.recommended_missing_items,
+          suggested_combinations: outfitToSave.suggested_combinations,
         }),
       });
 
@@ -518,6 +574,49 @@ function CreateOutfitContent() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Collection Selection: WHERE ARE YOU PLANNING TO WEAR YOUR LOOK? */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#7E6047]">
+              Where are you planning to wear your look? (My Collections)
+            </label>
+            <span className="text-[11px] text-[#9A7B5F]">Prioritizes collection items</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {collectionOptions.map((col) => {
+              const isSelected = selectedCollection === col.slug;
+              return (
+                <button
+                  key={col.slug}
+                  type="button"
+                  onClick={() => setSelectedCollection(col.slug)}
+                  className={`px-3.5 py-2 rounded-2xl text-xs font-medium transition-all flex items-center space-x-1.5 ${
+                    isSelected
+                      ? 'bg-[#18181B] text-white shadow-md scale-105'
+                      : 'bg-[#FAF8F5] border border-[#EBE5DB] text-[#5E4633] hover:border-[#18181B]'
+                  }`}
+                >
+                  <span>{col.emoji}</span>
+                  <span>{col.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Intelligent Conflict Notification if collection mismatches occasion */}
+        {detectedConflict && (
+          <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start space-x-2.5 animate-in fade-in">
+            <AlertCircle className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-1">
+              <span className="font-semibold">{detectedConflict}</span>
+              <p className="text-[11px] text-amber-800">
+                You can proceed and AUREVÉ will intelligently adapt, or switch collections above.
+              </p>
             </div>
           </div>
         )}

@@ -8,11 +8,15 @@ import {
   WardrobeStats,
   MainCategory,
   LearnedStyleProfile,
+  WardrobeCollection,
+  WardrobeCollectionItem,
+  DEFAULT_COLLECTION_DEFINITIONS,
 } from '@/lib/types';
 import { supabase, supabaseAdmin, isSupabaseConfigured } from './supabase';
 import { SAMPLE_INDIAN_WARDROBE } from '@/lib/ai/sampleWardrobe';
 import { buildLearnedStyleProfile } from '@/lib/ai/personalStyleEngine';
 import { normalizeMobileNumber } from '@/lib/auth/mobile';
+import { suggestCollectionsForItem } from '@/lib/ai/collectionClassifier';
 
 // Strict Isolated User Store for local state / caching
 interface IsolatedStore {
@@ -21,6 +25,8 @@ interface IsolatedStore {
   wardrobe: Map<string, WardrobeItem[]>; // userId -> items[]
   outfits: Map<string, Outfit[]>; // userId -> outfits[]
   feedback: Map<string, OutfitFeedback[]>; // userId -> feedback[]
+  collections: Map<string, WardrobeCollection[]>; // userId -> collections[]
+  collectionItems: Map<string, WardrobeCollectionItem[]>; // userId -> collectionItems[]
 }
 
 declare global {
@@ -33,6 +39,8 @@ const dbStore: IsolatedStore = global.__aureve_db__ || {
   wardrobe: new Map(),
   outfits: new Map(),
   feedback: new Map(),
+  collections: new Map(),
+  collectionItems: new Map(),
 };
 
 if (process.env.NODE_ENV !== 'production') {
@@ -678,9 +686,12 @@ export const Repository = {
       includeArchived?: boolean;
       favoritesOnly?: boolean;
       searchQuery?: string;
+      collectionId?: string;
     }
   ): Promise<WardrobeItem[]> {
     if (!userId) return [];
+
+    let items: WardrobeItem[] = [];
 
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
@@ -702,35 +713,27 @@ export const Repository = {
 
         const { data, error } = await query;
         if (!error && data) {
-          let items = data as WardrobeItem[];
-          if (options?.searchQuery) {
-            const q = options.searchQuery.toLowerCase();
-            items = items.filter(
-              (it) =>
-                it.name.toLowerCase().includes(q) ||
-                it.primary_color.toLowerCase().includes(q) ||
-                it.subcategory.toLowerCase().includes(q)
-            );
-          }
-          dbStore.wardrobe.set(userId, items);
-          return items;
+          items = data as WardrobeItem[];
         }
       } catch (err) {
         console.warn('Supabase getWardrobeItems note:', err);
       }
     }
 
-    let items = dbStore.wardrobe.get(userId) || [];
+    if (items.length === 0) {
+      items = dbStore.wardrobe.get(userId) || [];
 
-    if (!options?.includeArchived) {
-      items = items.filter((it) => !it.is_archived);
+      if (!options?.includeArchived) {
+        items = items.filter((it) => !it.is_archived);
+      }
+      if (options?.category) {
+        items = items.filter((it) => it.category === options.category);
+      }
+      if (options?.favoritesOnly) {
+        items = items.filter((it) => it.is_favorite);
+      }
     }
-    if (options?.category) {
-      items = items.filter((it) => it.category === options.category);
-    }
-    if (options?.favoritesOnly) {
-      items = items.filter((it) => it.is_favorite);
-    }
+
     if (options?.searchQuery) {
       const q = options.searchQuery.toLowerCase();
       items = items.filter(
@@ -742,6 +745,23 @@ export const Repository = {
       );
     }
 
+    // Attach collection assignments for each item
+    try {
+      const collectionItemMap = await this.getUserCollectionItemMap(userId);
+      items = items.map((it) => ({
+        ...it,
+        collection_ids: collectionItemMap.get(it.id) || [],
+      }));
+    } catch {
+      // Ignore collection mapping error
+    }
+
+    // If filtered by collectionId
+    if (options?.collectionId) {
+      items = items.filter((it) => it.collection_ids?.includes(options.collectionId!));
+    }
+
+    dbStore.wardrobe.set(userId, items);
     return items;
   },
 
@@ -780,6 +800,8 @@ export const Repository = {
       ...item,
     };
 
+    let createdItem: WardrobeItem = newItem;
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
         const { data, error } = await supabaseAdmin
@@ -806,21 +828,33 @@ export const Repository = {
           .single();
 
         if (!error && data) {
-          const created = data as WardrobeItem;
-          const items = dbStore.wardrobe.get(userId) || [];
-          items.unshift(created);
-          dbStore.wardrobe.set(userId, items);
-          return created;
+          createdItem = data as WardrobeItem;
         }
       } catch (err) {
         console.warn('Supabase addWardrobeItem note:', err);
       }
     }
 
+    // Resolve collection assignments: user explicitly selected or smart auto-suggest
+    let collectionsToAssign: string[] = item.collection_ids || [];
+    if (collectionsToAssign.length === 0) {
+      const suggestions = suggestCollectionsForItem(item);
+      collectionsToAssign = suggestions.map((s) => s.slug);
+    }
+
+    if (collectionsToAssign.length > 0) {
+      try {
+        const assigned = await this.setItemCollections(userId, createdItem.id, collectionsToAssign);
+        createdItem.collection_ids = assigned;
+      } catch (err) {
+        console.warn('Collection assignment note:', err);
+      }
+    }
+
     const items = dbStore.wardrobe.get(userId) || [];
-    items.unshift(newItem);
+    items.unshift(createdItem);
     dbStore.wardrobe.set(userId, items);
-    return newItem;
+    return createdItem;
   },
 
   async addWardrobeItemsBatch(
@@ -849,6 +883,8 @@ export const Repository = {
       times_worn: 0,
     }));
 
+    let savedItems: WardrobeItem[] = [];
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
         const { data, error } = await supabaseAdmin
@@ -857,25 +893,44 @@ export const Repository = {
           .select('*');
 
         if (!error && data) {
-          const createdItems = data as WardrobeItem[];
-          const current = dbStore.wardrobe.get(userId) || [];
-          dbStore.wardrobe.set(userId, [...createdItems, ...current]);
-          return createdItems;
+          savedItems = data as WardrobeItem[];
         }
       } catch (err) {
         console.warn('Supabase addWardrobeItemsBatch error:', err);
       }
     }
 
-    const createdFallback: WardrobeItem[] = rowsToInsert.map((row) => ({
-      ...row,
-      id: generateId(),
-      created_at: now,
-      updated_at: now,
-    }));
+    if (savedItems.length === 0) {
+      savedItems = rowsToInsert.map((row) => ({
+        ...row,
+        id: generateId(),
+        created_at: now,
+        updated_at: now,
+      }));
+    }
+
+    // Assign collections for each batch item
+    for (let i = 0; i < savedItems.length; i++) {
+      const it = savedItems[i];
+      const source = itemsList[i];
+      let collectionsToAssign: string[] = source?.collection_ids || [];
+      if (collectionsToAssign.length === 0) {
+        const suggestions = suggestCollectionsForItem(it);
+        collectionsToAssign = suggestions.map((s) => s.slug);
+      }
+      if (collectionsToAssign.length > 0) {
+        try {
+          const assigned = await this.setItemCollections(userId, it.id, collectionsToAssign);
+          it.collection_ids = assigned;
+        } catch {
+          // Ignore
+        }
+      }
+    }
+
     const current = dbStore.wardrobe.get(userId) || [];
-    dbStore.wardrobe.set(userId, [...createdFallback, ...current]);
-    return createdFallback;
+    dbStore.wardrobe.set(userId, [...savedItems, ...current]);
+    return savedItems;
   },
 
   async updateWardrobeItem(
@@ -926,6 +981,21 @@ export const Repository = {
   async deleteWardrobeItem(userId: string, itemId: string): Promise<boolean> {
     if (!userId || !itemId) return false;
 
+    // Clean up collection junctions
+    try {
+      if (isSupabaseConfigured && supabaseAdmin) {
+        await supabaseAdmin
+          .from('wardrobe_collection_items')
+          .delete()
+          .eq('user_id', userId)
+          .eq('wardrobe_item_id', itemId);
+      }
+    } catch {
+      // Ignore
+    }
+    const localCollectionItems = (dbStore.collectionItems.get(userId) || []).filter((ci) => ci.wardrobe_item_id !== itemId);
+    dbStore.collectionItems.set(userId, localCollectionItems);
+
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
         const { error } = await supabaseAdmin
@@ -952,6 +1022,21 @@ export const Repository = {
 
   async deleteWardrobeItemsBatch(userId: string, itemIds: string[]): Promise<boolean> {
     if (!userId || !itemIds || itemIds.length === 0) return true;
+
+    // Clean up collection junctions
+    try {
+      if (isSupabaseConfigured && supabaseAdmin) {
+        await supabaseAdmin
+          .from('wardrobe_collection_items')
+          .delete()
+          .eq('user_id', userId)
+          .in('wardrobe_item_id', itemIds);
+      }
+    } catch {
+      // Ignore
+    }
+    const localCollectionItems = (dbStore.collectionItems.get(userId) || []).filter((ci) => !itemIds.includes(ci.wardrobe_item_id));
+    dbStore.collectionItems.set(userId, localCollectionItems);
 
     if (isSupabaseConfigured && supabaseAdmin) {
       try {
@@ -1340,5 +1425,429 @@ export const Repository = {
       dominantColors,
       styleInsights,
     };
+  },
+
+  // ============================================================================
+  // SMART WARDROBE COLLECTIONS (STRICT USER ISOLATION & PLAYLIST ARCHITECTURE)
+  // ============================================================================
+
+  /**
+   * Helper to retrieve map of itemId -> collectionIds[] for a given user
+   */
+  async getUserCollectionItemMap(userId: string): Promise<Map<string, string[]>> {
+    const map = new Map<string, string[]>();
+    if (!userId) return map;
+
+    // 1. Try Supabase
+    if (isSupabaseConfigured && supabaseAdmin) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('wardrobe_collection_items')
+          .select('collection_id, wardrobe_item_id')
+          .eq('user_id', userId);
+
+        if (!error && data) {
+          data.forEach((row: any) => {
+            const list = map.get(row.wardrobe_item_id) || [];
+            if (!list.includes(row.collection_id)) list.push(row.collection_id);
+            map.set(row.wardrobe_item_id, list);
+          });
+          return map;
+        }
+      } catch (err) {
+        // Fallback to local store
+      }
+    }
+
+    // 2. Fallback to local store
+    const localItems = dbStore.collectionItems.get(userId) || [];
+    localItems.forEach((ci) => {
+      const list = map.get(ci.wardrobe_item_id) || [];
+      if (!list.includes(ci.collection_id)) list.push(ci.collection_id);
+      map.set(ci.wardrobe_item_id, list);
+    });
+
+    return map;
+  },
+
+  /**
+   * Get all collections for a user, auto-initializing default 6 collections if not present
+   */
+  async getCollections(userId: string): Promise<WardrobeCollection[]> {
+    if (!userId) return [];
+
+    let collections: WardrobeCollection[] = [];
+    const now = new Date().toISOString();
+
+    // 1. Check Supabase
+    if (isSupabaseConfigured && supabaseAdmin) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('wardrobe_collections')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: true });
+
+        if (!error && data) {
+          collections = data as WardrobeCollection[];
+        }
+      } catch (err) {
+        console.warn('Supabase getCollections note:', err);
+      }
+    }
+
+    if (collections.length === 0) {
+      collections = dbStore.collections.get(userId) || [];
+    }
+
+    // Auto-seed default 6 collections if user has no collections yet
+    if (collections.length === 0) {
+      const defaultCollectionsToSeed: WardrobeCollection[] = DEFAULT_COLLECTION_DEFINITIONS.map((def) => ({
+        id: generateId(),
+        user_id: userId,
+        name: def.name,
+        slug: def.slug,
+        description: def.description,
+        collection_type: 'system',
+        icon: def.icon,
+        created_at: now,
+        updated_at: now,
+      }));
+
+      // Try persisting to Supabase
+      if (isSupabaseConfigured && supabaseAdmin) {
+        try {
+          const { data, error } = await supabaseAdmin
+            .from('wardrobe_collections')
+            .insert(defaultCollectionsToSeed)
+            .select('*');
+          if (!error && data) {
+            collections = data as WardrobeCollection[];
+          } else {
+            collections = defaultCollectionsToSeed;
+          }
+        } catch {
+          collections = defaultCollectionsToSeed;
+        }
+      } else {
+        collections = defaultCollectionsToSeed;
+      }
+
+      dbStore.collections.set(userId, collections);
+    }
+
+    // Attach item counts and preview thumbnails for each collection
+    const itemMap = await this.getUserCollectionItemMap(userId);
+    const userWardrobe = (dbStore.wardrobe.get(userId) || []).filter((i) => !i.is_archived);
+
+    // Build collection -> items mapping
+    const colToItemIds = new Map<string, string[]>();
+    for (const [itemId, colIds] of Array.from(itemMap.entries())) {
+      colIds.forEach((cId) => {
+        const list = colToItemIds.get(cId) || [];
+        list.push(itemId);
+        colToItemIds.set(cId, list);
+      });
+    }
+
+    const enrichedCollections = collections.map((col) => {
+      // Find matching item IDs either by collection ID or by slug
+      const itemIds = colToItemIds.get(col.id) || colToItemIds.get(col.slug) || [];
+      const matchingItems = userWardrobe.filter((w) => itemIds.includes(w.id));
+      const previewThumbnails = matchingItems.map((m) => m.image_url).filter(Boolean).slice(0, 4);
+
+      return {
+        ...col,
+        item_count: matchingItems.length,
+        preview_image_urls: previewThumbnails,
+      };
+    });
+
+    dbStore.collections.set(userId, enrichedCollections);
+    return enrichedCollections;
+  },
+
+  /**
+   * Get single collection by ID or slug
+   */
+  async getCollectionById(userId: string, collectionIdOrSlug: string): Promise<WardrobeCollection | null> {
+    const collections = await this.getCollections(userId);
+    return collections.find((c) => c.id === collectionIdOrSlug || c.slug === collectionIdOrSlug) || null;
+  },
+
+  /**
+   * Create custom collection
+   */
+  async createCollection(
+    userId: string,
+    data: { name: string; description?: string; icon?: string }
+  ): Promise<WardrobeCollection> {
+    const collections = await this.getCollections(userId);
+    const trimmedName = data.name.trim();
+
+    // Check duplicate name
+    const existing = collections.find((c) => c.name.toLowerCase() === trimmedName.toLowerCase());
+    if (existing) {
+      return existing;
+    }
+
+    const slug = trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const now = new Date().toISOString();
+    const newCol: WardrobeCollection = {
+      id: generateId(),
+      user_id: userId,
+      name: trimmedName,
+      slug: slug || `custom_${Date.now()}`,
+      description: data.description?.trim() || 'Custom curated wardrobe collection.',
+      collection_type: 'custom',
+      icon: data.icon || 'FolderHeart',
+      item_count: 0,
+      preview_image_urls: [],
+      created_at: now,
+      updated_at: now,
+    };
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      try {
+        const { data: created, error } = await supabaseAdmin
+          .from('wardrobe_collections')
+          .insert({
+            id: newCol.id,
+            user_id: userId,
+            name: newCol.name,
+            slug: newCol.slug,
+            description: newCol.description,
+            collection_type: newCol.collection_type,
+            icon: newCol.icon,
+          })
+          .select('*')
+          .single();
+
+        if (!error && created) {
+          const list = [...collections, created as WardrobeCollection];
+          dbStore.collections.set(userId, list);
+          return created as WardrobeCollection;
+        }
+      } catch (err) {
+        console.warn('Supabase createCollection note:', err);
+      }
+    }
+
+    const list = [...collections, newCol];
+    dbStore.collections.set(userId, list);
+    return newCol;
+  },
+
+  /**
+   * Update collection name, description, or icon
+   */
+  async updateCollection(
+    userId: string,
+    collectionId: string,
+    updates: { name?: string; description?: string; icon?: string }
+  ): Promise<WardrobeCollection | null> {
+    const collections = await this.getCollections(userId);
+    const target = collections.find((c) => c.id === collectionId);
+    if (!target) return null;
+
+    const updatedCol: WardrobeCollection = {
+      ...target,
+      name: updates.name ? updates.name.trim() : target.name,
+      description: updates.description !== undefined ? updates.description.trim() : target.description,
+      icon: updates.icon || target.icon,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (isSupabaseConfigured && supabaseAdmin) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('wardrobe_collections')
+          .update({
+            name: updatedCol.name,
+            description: updatedCol.description,
+            icon: updatedCol.icon,
+            updated_at: updatedCol.updated_at,
+          })
+          .eq('user_id', userId)
+          .eq('id', collectionId)
+          .select('*')
+          .maybeSingle();
+
+        if (!error && data) {
+          const updatedList = collections.map((c) => (c.id === collectionId ? (data as WardrobeCollection) : c));
+          dbStore.collections.set(userId, updatedList);
+          return data as WardrobeCollection;
+        }
+      } catch (err) {
+        console.warn('Supabase updateCollection note:', err);
+      }
+    }
+
+    const updatedList = collections.map((c) => (c.id === collectionId ? updatedCol : c));
+    dbStore.collections.set(userId, updatedList);
+    return updatedCol;
+  },
+
+  /**
+   * Delete custom collection
+   * IMPORTANT: Deleting a collection NEVER deletes the actual wardrobe items.
+   */
+  async deleteCollection(userId: string, collectionId: string): Promise<boolean> {
+    const collections = await this.getCollections(userId);
+    const target = collections.find((c) => c.id === collectionId);
+    if (!target) return false;
+
+    // Delete from Supabase
+    if (isSupabaseConfigured && supabaseAdmin) {
+      try {
+        await supabaseAdmin
+          .from('wardrobe_collection_items')
+          .delete()
+          .eq('user_id', userId)
+          .eq('collection_id', collectionId);
+
+        await supabaseAdmin
+          .from('wardrobe_collections')
+          .delete()
+          .eq('user_id', userId)
+          .eq('id', collectionId);
+      } catch (err) {
+        console.warn('Supabase deleteCollection note:', err);
+      }
+    }
+
+    // Delete from local cache
+    const updatedCollections = collections.filter((c) => c.id !== collectionId);
+    dbStore.collections.set(userId, updatedCollections);
+
+    const localItems = dbStore.collectionItems.get(userId) || [];
+    dbStore.collectionItems.set(
+      userId,
+      localItems.filter((ci) => ci.collection_id !== collectionId)
+    );
+
+    return true;
+  },
+
+  /**
+   * Get all wardrobe items belonging to a collection
+   */
+  async getItemsInCollection(userId: string, collectionIdOrSlug: string): Promise<WardrobeItem[]> {
+    const collections = await this.getCollections(userId);
+    const col = collections.find((c) => c.id === collectionIdOrSlug || c.slug === collectionIdOrSlug);
+    if (!col) return [];
+
+    const itemMap = await this.getUserCollectionItemMap(userId);
+    const targetItemIds: string[] = [];
+    for (const [itemId, colIds] of Array.from(itemMap.entries())) {
+      if (colIds.includes(col.id) || colIds.includes(col.slug)) {
+        targetItemIds.push(itemId);
+      }
+    }
+
+    if (targetItemIds.length === 0) return [];
+
+    const allWardrobe = await this.getWardrobeItems(userId, { includeArchived: false });
+    return allWardrobe.filter((item) => targetItemIds.includes(item.id));
+  },
+
+  /**
+   * Get collection IDs that an item is currently assigned to
+   */
+  async getItemCollectionIds(userId: string, itemId: string): Promise<string[]> {
+    const itemMap = await this.getUserCollectionItemMap(userId);
+    return itemMap.get(itemId) || [];
+  },
+
+  /**
+   * Set collections for an item (Replaces existing assignments)
+   * An item can belong to multiple collections.
+   */
+  async setItemCollections(
+    userId: string,
+    itemId: string,
+    collectionIdsOrSlugs: string[]
+  ): Promise<string[]> {
+    if (!userId || !itemId) return [];
+
+    const collections = await this.getCollections(userId);
+
+    // Resolve slugs to collection IDs
+    const resolvedIds = Array.from(
+      new Set(
+        collectionIdsOrSlugs
+          .map((idOrSlug) => {
+            const found = collections.find((c) => c.id === idOrSlug || c.slug === idOrSlug);
+            return found ? found.id : idOrSlug;
+          })
+          .filter(Boolean)
+      )
+    );
+
+    // 1. Update Supabase
+    if (isSupabaseConfigured && supabaseAdmin) {
+      try {
+        // Delete existing junction entries for this item
+        await supabaseAdmin
+          .from('wardrobe_collection_items')
+          .delete()
+          .eq('user_id', userId)
+          .eq('wardrobe_item_id', itemId);
+
+        if (resolvedIds.length > 0) {
+          const rows = resolvedIds.map((colId) => ({
+            collection_id: colId,
+            wardrobe_item_id: itemId,
+            user_id: userId,
+          }));
+          await supabaseAdmin.from('wardrobe_collection_items').insert(rows);
+        }
+      } catch (err) {
+        console.warn('Supabase setItemCollections note:', err);
+      }
+    }
+
+    // 2. Update local store
+    const localItems = (dbStore.collectionItems.get(userId) || []).filter((ci) => ci.wardrobe_item_id !== itemId);
+    const newLocalRows: WardrobeCollectionItem[] = resolvedIds.map((colId) => ({
+      id: generateId(),
+      collection_id: colId,
+      wardrobe_item_id: itemId,
+      user_id: userId,
+      created_at: new Date().toISOString(),
+    }));
+
+    dbStore.collectionItems.set(userId, [...localItems, ...newLocalRows]);
+
+    // Update item collection_ids in wardrobe cache
+    const cachedWardrobe = dbStore.wardrobe.get(userId) || [];
+    const updatedWardrobe = cachedWardrobe.map((item) =>
+      item.id === itemId ? { ...item, collection_ids: resolvedIds } : item
+    );
+    dbStore.wardrobe.set(userId, updatedWardrobe);
+
+    return resolvedIds;
+  },
+
+  /**
+   * Add a single item to a collection
+   */
+  async addItemToCollection(userId: string, itemId: string, collectionId: string): Promise<boolean> {
+    const existingIds = await this.getItemCollectionIds(userId, itemId);
+    if (!existingIds.includes(collectionId)) {
+      await this.setItemCollections(userId, itemId, [...existingIds, collectionId]);
+    }
+    return true;
+  },
+
+  /**
+   * Remove item from a collection
+   * IMPORTANT: Does not delete the item from the main wardrobe.
+   */
+  async removeItemFromCollection(userId: string, itemId: string, collectionId: string): Promise<boolean> {
+    const existingIds = await this.getItemCollectionIds(userId, itemId);
+    const filtered = existingIds.filter((id) => id !== collectionId);
+    await this.setItemCollections(userId, itemId, filtered);
+    return true;
   },
 };

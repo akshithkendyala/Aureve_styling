@@ -10,6 +10,8 @@ import {
   OutfitFeedback,
   LearnedStyleProfile,
   CustomOccasionContext,
+  RecommendedMissingItem,
+  SuggestedCombination,
 } from '@/lib/types';
 import {
   OCCASION_RULES,
@@ -25,6 +27,10 @@ import {
   interpretCustomOccasion,
   buildCustomOccasionRule,
 } from '@/lib/ai/customOccasionEngine';
+import {
+  generatePartialWardrobeStyling,
+  checkCollectionOccasionConflict,
+} from '@/lib/ai/partialWardrobeStylist';
 
 export interface GenerateOutfitParams {
   userId: string;
@@ -32,6 +38,9 @@ export interface GenerateOutfitParams {
   wardrobe: WardrobeItem[];
   occasion: OccasionType | string;
   customOccasionText?: string;
+  collection?: string | null;
+  collectionSlug?: string | null;
+  collectionId?: string | null;
   date: string;
   time?: string;
   location?: string;
@@ -849,6 +858,9 @@ export async function generateIntelligentOutfit(
     userProfile,
     occasion,
     customOccasionText,
+    collection,
+    collectionSlug,
+    collectionId,
     date,
     time = '19:00',
     location = '',
@@ -878,6 +890,8 @@ export async function generateIntelligentOutfit(
     rule = getOccasionRule(occasion);
   }
 
+  const conflictNote = checkCollectionOccasionConflict(collectionSlug || collection, rule.key);
+
   // Step 3: Hard Pre-Filtering based on Occasion Rules
   let validTops = activeItems.filter((i) => i.category === 'tops' && isItemPermittedForOccasion(i, 'tops', rule));
   let validBottoms = activeItems.filter((i) => i.category === 'bottoms' && isItemPermittedForOccasion(i, 'bottoms', rule));
@@ -902,9 +916,59 @@ export async function generateIntelligentOutfit(
     );
   }
 
+  // Collection prioritization: if user selected a collection, prioritize pieces in that collection
+  const colTarget = (collectionId || collectionSlug || collection || '').toLowerCase().trim();
+  if (colTarget && colTarget !== 'all' && colTarget !== 'all collections') {
+    const belongsToCol = (item: WardrobeItem) => {
+      if (item.collection_ids?.some((c) => c.toLowerCase() === colTarget)) return true;
+      if (item.collections?.some((c) => c.slug.toLowerCase() === colTarget || c.name.toLowerCase() === colTarget || c.id === colTarget)) return true;
+      return false;
+    };
+
+    const colTops = validTops.filter(belongsToCol);
+    const colBottoms = validBottoms.filter(belongsToCol);
+    const colFootwear = validFootwear.filter(belongsToCol);
+
+    if (colTops.length > 0) validTops = colTops;
+    if (colBottoms.length > 0) validBottoms = colBottoms;
+    if (colFootwear.length > 0) validFootwear = colFootwear;
+  }
+
   const hasOnePieceTops = validTops.some(isOnePiece);
   if (validTops.length === 0 || (validBottoms.length === 0 && !hasOnePieceTops)) {
-    throw new Error(`Your wardrobe does not contain appropriate clothing pieces for ${rule.name}. Please add appropriate pieces to your wardrobe.`);
+    // INTELLIGENT PARTIAL WARDROBE STYLING ENGINE
+    const partialResult = await generatePartialWardrobeStyling({
+      wardrobe: activeItems,
+      rule,
+      collectionName: collection,
+      collectionSlug: collectionSlug,
+      userProfile,
+      weather,
+      geminiApiKey: process.env.GEMINI_API_KEY,
+    });
+
+    return {
+      occasion,
+      custom_occasion_text: customOccasionSaved,
+      interpreted_occasion: interpretedOccasionSaved,
+      collection: collection || null,
+      collection_id: collectionId || null,
+      wardrobe_completeness: partialResult.wardrobe_completeness,
+      conflict_note: conflictNote || partialResult.conflict_note || null,
+      date,
+      time,
+      location,
+      weather_data: weather,
+      title: partialResult.title,
+      ai_explanation: partialResult.ai_explanation,
+      style_match: partialResult.style_match,
+      style_direction: partialResult.style_direction,
+      items: partialResult.owned_items,
+      recommended_missing_items: partialResult.recommended_missing_items,
+      suggested_combinations: partialResult.suggested_combinations,
+      alternative_looks: [],
+      missing_item: null,
+    };
   }
 
   // Step 3.5: Build Dynamic Learned Personal Style Profile from Feedback History
@@ -927,7 +991,38 @@ export async function generateIntelligentOutfit(
 
   const topCandidate = rankedCandidates[0];
   if (!topCandidate) {
-    throw new Error(`Could not formulate a valid outfit for ${rule.name} with your current wardrobe.`);
+    const partialResult = await generatePartialWardrobeStyling({
+      wardrobe: activeItems,
+      rule,
+      collectionName: collection,
+      collectionSlug: collectionSlug,
+      userProfile,
+      weather,
+      geminiApiKey: process.env.GEMINI_API_KEY,
+    });
+
+    return {
+      occasion,
+      custom_occasion_text: customOccasionSaved,
+      interpreted_occasion: interpretedOccasionSaved,
+      collection: collection || null,
+      collection_id: collectionId || null,
+      wardrobe_completeness: partialResult.wardrobe_completeness,
+      conflict_note: conflictNote || partialResult.conflict_note || null,
+      date,
+      time,
+      location,
+      weather_data: weather,
+      title: partialResult.title,
+      ai_explanation: partialResult.ai_explanation,
+      style_match: partialResult.style_match,
+      style_direction: partialResult.style_direction,
+      items: partialResult.owned_items,
+      recommended_missing_items: partialResult.recommended_missing_items,
+      suggested_combinations: partialResult.suggested_combinations,
+      alternative_looks: [],
+      missing_item: null,
+    };
   }
 
   // Step 5: AI Styling Enhancement via Gemini with Strict Guardrails
@@ -1109,10 +1204,32 @@ MANDATORY INSTRUCTIONS:
     weather
   );
 
+  const hasFootwearItem = Boolean(finalLook.footwear);
+  const completeness = hasFootwearItem ? 'complete' : 'partial';
+  const missingItemsList: RecommendedMissingItem[] = [];
+  if (!hasFootwearItem) {
+    missingItemsList.push({
+      name:
+        rule.key === 'interview' || rule.key === 'office'
+          ? 'Dark Leather Formal Shoes / Loafers'
+          : rule.key === 'wedding' || rule.key === 'festival'
+          ? 'Handcrafted Traditional Leather Juttis'
+          : 'Minimalist Low-Top Sneakers',
+      category: 'footwear',
+      reason: `Anchors the ${finalLook.top.name} and ${finalLook.bottom?.name || 'outfit'} with occasion-appropriate grounding.`,
+      why_it_works: 'Completes your silhouette so the look feels intentional from head to toe.',
+      priority: 'essential',
+    });
+  }
+
   return {
     occasion,
     custom_occasion_text: customOccasionSaved,
     interpreted_occasion: interpretedOccasionSaved,
+    collection: collection || null,
+    collection_id: collectionId || null,
+    wardrobe_completeness: completeness,
+    conflict_note: conflictNote || null,
     date,
     time,
     location,
@@ -1124,6 +1241,7 @@ MANDATORY INSTRUCTIONS:
     items,
     alternative_looks: alternativeLooks,
     missing_item: missingItemSuggestion,
+    recommended_missing_items: missingItemsList.length > 0 ? missingItemsList : undefined,
   };
 }
 

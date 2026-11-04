@@ -28,7 +28,17 @@ export function ItemDetailModal({
   const [fit, setFit] = useState('');
   const [formality, setFormality] = useState<any>('Smart Casual');
   const [material, setMaterial] = useState('');
+  const [itemCollections, setItemCollections] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  const STANDARD_COLLECTIONS = [
+    { slug: 'everyday', name: 'Everyday' },
+    { slug: 'college_work', name: 'College & Work' },
+    { slug: 'traditional_festive', name: 'Traditional & Festive' },
+    { slug: 'party_occasions', name: 'Party & Occasions' },
+    { slug: 'home_comfort', name: 'Home & Comfort' },
+    { slug: 'outdoor_travel', name: 'Outdoor & Travel' },
+  ];
 
   React.useEffect(() => {
     if (item) {
@@ -37,6 +47,7 @@ export function ItemDetailModal({
       setFit(item.fit || 'Regular');
       setFormality(item.formality || 'Smart Casual');
       setMaterial(item.material || 'Cotton');
+      setItemCollections(item.collection_ids || []);
       setIsEditing(false);
     }
   }, [item]);
@@ -55,11 +66,12 @@ export function ItemDetailModal({
           fit,
           formality,
           material,
+          collection_ids: itemCollections,
         }),
       });
       const data = await res.json();
       if (data.success && data.item) {
-        onUpdate(data.item);
+        onUpdate({ ...data.item, collection_ids: itemCollections });
         setIsEditing(false);
       }
     } catch (err) {
@@ -175,6 +187,39 @@ export function ItemDetailModal({
                     </div>
                   </div>
 
+                  {/* Collections Selection in Edit Mode */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#7E6047] uppercase mb-1.5">
+                      Assigned Collections (Click to toggle)
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {STANDARD_COLLECTIONS.map((c) => {
+                        const active = itemCollections.includes(c.slug) || itemCollections.includes(c.name);
+                        return (
+                          <button
+                            key={c.slug}
+                            type="button"
+                            onClick={() => {
+                              setItemCollections((prev) =>
+                                prev.includes(c.slug)
+                                  ? prev.filter((slug) => slug !== c.slug && slug !== c.name)
+                                  : [...prev, c.slug]
+                              );
+                            }}
+                            className={`px-3 py-1 rounded-full text-[11px] font-medium transition-all ${
+                              active
+                                ? 'bg-[#18181B] text-white shadow-2xs'
+                                : 'bg-white border border-[#EBE5DB] text-[#7E6047] hover:border-[#18181B]'
+                            }`}
+                          >
+                            {active ? '✓ ' : '+ '}
+                            {c.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <div className="flex items-center space-x-2 pt-2">
                     <button
                       type="button"
@@ -268,6 +313,35 @@ export function ItemDetailModal({
                       </div>
                     </div>
                   )}
+
+                  {/* Collections Badges */}
+                  <div>
+                    <span className="block text-[10px] uppercase text-[#7E6047] font-semibold mb-1.5">
+                      Collections
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {itemCollections.length > 0 ? (
+                        itemCollections.map((colIdOrSlug) => {
+                          const matched = STANDARD_COLLECTIONS.find(
+                            (c) => c.slug === colIdOrSlug || c.name === colIdOrSlug
+                          );
+                          const label = matched ? matched.name : colIdOrSlug;
+                          return (
+                            <span
+                              key={colIdOrSlug}
+                              className="bg-[#18181B] text-[#FAF8F5] text-[10px] font-semibold px-2.5 py-0.5 rounded-full"
+                            >
+                              {label}
+                            </span>
+                          );
+                        })
+                      ) : (
+                        <span className="text-xs text-[#9A7B5F] italic">
+                          Click &ldquo;Edit Piece&rdquo; to assign collections
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </>
               )}
             </div>

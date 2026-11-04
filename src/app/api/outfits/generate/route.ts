@@ -15,6 +15,9 @@ export async function POST(req: NextRequest) {
     const {
       occasion = 'Date',
       customOccasionText,
+      collection,
+      collectionSlug,
+      collectionId,
       date,
       time,
       location,
@@ -36,7 +39,7 @@ export async function POST(req: NextRequest) {
     if (!wardrobe || wardrobe.length === 0) {
       return NextResponse.json(
         {
-          error: 'Your wardrobe is empty. Please add your tops and bottoms first so AUREVÉ can style them.',
+          error: 'Your wardrobe is empty. Please add your clothing pieces first so AUREVÉ can style them.',
           needsWardrobe: true,
         },
         { status: 400 }
@@ -58,6 +61,9 @@ export async function POST(req: NextRequest) {
       wardrobe,
       occasion,
       customOccasionText,
+      collection,
+      collectionSlug,
+      collectionId,
       date: targetDate,
       time: targetTime,
       location: resolvedLocation,

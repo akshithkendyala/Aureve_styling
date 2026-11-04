@@ -51,12 +51,22 @@ export interface StagedItem {
   style: string;
   formality: 'Casual' | 'Smart Casual' | 'Semi-Formal' | 'Formal' | 'Festive';
   season: string[];
+  collections?: string[];
   isFavorite: boolean;
   status: 'pending' | 'analyzing' | 'done' | 'error';
   errorMsg?: string;
 }
 
 const DEFAULT_SEASONS = ['Summer', 'All-Season'];
+
+const STANDARD_COLLECTIONS = [
+  { slug: 'everyday', name: 'Everyday' },
+  { slug: 'college_work', name: 'College & Work' },
+  { slug: 'traditional_festive', name: 'Traditional & Festive' },
+  { slug: 'party_occasions', name: 'Party & Occasions' },
+  { slug: 'home_comfort', name: 'Home & Comfort' },
+  { slug: 'outdoor_travel', name: 'Outdoor & Travel' },
+];
 
 /**
  * High-performance client-side Canvas compressor + Garment-region color extractor:
@@ -388,6 +398,10 @@ export function AddClothingModal({
                 finalName = `${colorName} ${detectedSubcategory}`;
               }
 
+              const suggestedCols = Array.isArray(c.suggested_collections)
+                ? c.suggested_collections.map((sc: any) => sc.slug || sc.name)
+                : ['everyday'];
+
               updated[i] = {
                 ...updated[i],
                 name: finalName,
@@ -400,6 +414,7 @@ export function AddClothingModal({
                 style: c.style || 'Smart Casual',
                 formality: c.formality || 'Smart Casual',
                 season: c.season && c.season.length > 0 ? c.season : ['All-Season'],
+                collections: suggestedCols.length > 0 ? suggestedCols : ['everyday'],
                 status: 'done',
               };
               classified = true;
@@ -427,6 +442,7 @@ export function AddClothingModal({
           subcategory: 'Other',
           material: 'Unknown / Not visible',
           fit: 'Regular',
+          collections: ['everyday'],
           status: 'done',
         };
       }
@@ -499,6 +515,12 @@ export function AddClothingModal({
     updateActiveItem('season', next);
   };
 
+  const toggleCollectionForActive = (colSlug: string) => {
+    const cur = activeItem?.collections || [];
+    const next = cur.includes(colSlug) ? cur.filter((c) => c !== colSlug) : [...cur, colSlug];
+    updateActiveItem('collections', next);
+  };
+
   // Save all items to Supabase
   const handleSaveAll = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -520,6 +542,7 @@ export function AddClothingModal({
         style: item.style,
         formality: item.formality,
         season: item.season,
+        collection_ids: item.collections || [],
         is_favorite: item.isFavorite,
       }));
 
@@ -1054,6 +1077,38 @@ export function AddClothingModal({
                           }`}
                         >
                           {s}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Assigned Collections (Spotify-style Wardrobe Collections) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#7E6047]">
+                      My Collections (Where do you wear this piece?)
+                    </label>
+                    <span className="text-[10px] text-[#9A7B5F]">Multiple allowed</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {STANDARD_COLLECTIONS.map((c) => {
+                      const active =
+                        activeItem.collections?.includes(c.slug) ||
+                        activeItem.collections?.includes(c.name);
+                      return (
+                        <button
+                          type="button"
+                          key={c.slug}
+                          onClick={() => toggleCollectionForActive(c.slug)}
+                          className={`inline-flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                            active
+                              ? 'bg-[#18181B] text-white shadow-xs'
+                              : 'bg-[#FAF8F5] border border-[#EBE5DB] text-[#5E4633] hover:bg-[#F4EFEA]'
+                          }`}
+                        >
+                          {active && <Check className="w-3.5 h-3.5 text-[#EEDC82]" />}
+                          <span>{c.name}</span>
                         </button>
                       );
                     })}

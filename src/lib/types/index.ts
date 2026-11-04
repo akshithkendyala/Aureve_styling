@@ -209,6 +209,8 @@ export interface WardrobeItem {
   is_archived?: boolean;
   times_worn: number;
   last_worn_at?: string | null;
+  collection_ids?: string[];
+  collections?: { id: string; name: string; slug: string }[];
   created_at: string;
   updated_at?: string;
 }
@@ -287,12 +289,33 @@ export interface SelfStyledAnalysis {
   occasion?: string;
 }
 
+export interface RecommendedMissingItem {
+  name: string; // e.g. "Beige Straight-Fit Trousers"
+  category: 'tops' | 'bottoms' | 'footwear' | 'layers' | 'accessories';
+  reason: string; // e.g. "Creates a clean, balanced smart-casual look."
+  why_it_works: string; // e.g. "Balances proportions and neutral tones for Indian campus/work settings."
+  priority: 'essential' | 'recommended';
+  color_suggestion?: string;
+  fabric_suggestion?: string;
+  substitutes?: string[];
+}
+
+export interface SuggestedCombination {
+  name: string; // e.g. "Modern Smart Casual"
+  combination: string[]; // ["Black Shirt (In your wardrobe)", "Beige Straight-Fit Trousers", "White Minimal Sneakers"]
+  styling_tip: string;
+}
+
 export interface Outfit {
   id: string;
   user_id: string;
   occasion: OccasionType | string;
   custom_occasion_text?: string | null;
   interpreted_occasion?: string | null;
+  collection?: string | null; // e.g. "College & Work" or "Everyday"
+  collection_id?: string | null;
+  wardrobe_completeness?: 'complete' | 'partial' | 'single_item';
+  conflict_note?: string | null;
   date: string;
   time?: string;
   location?: string;
@@ -304,11 +327,97 @@ export interface Outfit {
   items: OutfitItemReference[];
   alternative_looks?: AlternativeLook[];
   missing_item?: MissingItemSuggestion | null;
+  recommended_missing_items?: RecommendedMissingItem[];
+  suggested_combinations?: SuggestedCombination[];
   is_self_styled?: boolean;
   self_styled_analysis?: SelfStyledAnalysis | null;
   created_at: string;
   worn?: boolean;
 }
+
+export type CollectionSlug =
+  | 'everyday'
+  | 'college_work'
+  | 'traditional_festive'
+  | 'party_occasions'
+  | 'home_comfort'
+  | 'outdoor_travel'
+  | string;
+
+export interface WardrobeCollection {
+  id: string;
+  user_id: string;
+  name: string;
+  slug: CollectionSlug;
+  description: string;
+  collection_type: 'system' | 'custom';
+  icon: string; // e.g., "Sun", "Briefcase", "Sparkles", "PartyPopper", "Home", "Plane", "FolderHeart"
+  item_count?: number;
+  preview_image_urls?: string[];
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface WardrobeCollectionItem {
+  id: string;
+  collection_id: string;
+  wardrobe_item_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface DefaultCollectionDef {
+  name: string;
+  slug: CollectionSlug;
+  description: string;
+  icon: string;
+  keywords: string[];
+}
+
+export const DEFAULT_COLLECTION_DEFINITIONS: DefaultCollectionDef[] = [
+  {
+    name: 'Everyday',
+    slug: 'everyday',
+    description: 'Regular casual clothing, frequently used tees, everyday shirts, jeans, and comfortable daily footwear.',
+    icon: 'Sun',
+    keywords: ['casual', 't-shirt', 'shirt', 'jeans', 'chinos', 'sneakers', 'sandals', 'daily'],
+  },
+  {
+    name: 'College & Work',
+    slug: 'college_work',
+    description: 'College outfits, smart casuals, office formal shirts & trousers, interview wear, and presentation styles.',
+    icon: 'Briefcase',
+    keywords: ['formal', 'shirt', 'trousers', 'blazer', 'polo', 'chinos', 'loafers', 'shoes', 'work', 'college', 'office', 'interview'],
+  },
+  {
+    name: 'Traditional & Festive',
+    slug: 'traditional_festive',
+    description: 'Kurtas, ethnic wear, sarees, lehengas, festive footwear, wedding guest outfits, and Indo-Western attire.',
+    icon: 'Sparkles',
+    keywords: ['kurta', 'kurti', 'saree', 'lehenga', 'ethnic', 'festive', 'juttis', 'mojaris', 'kolhapuris', 'nehru jacket', 'dupatta', 'anarkali', 'sharara', 'dhoti', 'pajama'],
+  },
+  {
+    name: 'Party & Occasions',
+    slug: 'party_occasions',
+    description: 'Statement party shirts, stylish tees, night-out jeans, dresses, dinner outfits, and celebration partywear.',
+    icon: 'PartyPopper',
+    keywords: ['party', 'evening', 'dress', 'club', 'dinner', 'birthday', 'black shirt', 'stylish', 'sleek', 'boots', 'heels'],
+  },
+  {
+    name: 'Home & Comfort',
+    slug: 'home_comfort',
+    description: 'Relaxed shorts, banyans, track pants, comfortable tees, nightwear, and everyday home loungewear.',
+    icon: 'Home',
+    keywords: ['shorts', 'track pants', 'joggers', 't-shirt', 'banyan', 'vest', 'slippers', 'slides', 'pajama', 'nightwear', 'loungewear', 'home'],
+  },
+  {
+    name: 'Outdoor & Travel',
+    slug: 'outdoor_travel',
+    description: 'Travel-friendly outfits, walking layers, utility pants, weather-appropriate pieces, and transit footwear.',
+    icon: 'Plane',
+    keywords: ['travel', 'jacket', 'hoodie', 'cargo', 'walking shoes', 'sneakers', 'backpack', 'sunglasses', 'windbreaker', 'outdoor'],
+  },
+];
 
 export interface AlternativeLook {
   title: string; // e.g. "Look 02 — More Relaxed"

@@ -15,12 +15,14 @@ export async function GET(req: NextRequest) {
     const includeArchived = searchParams.get('includeArchived') === 'true';
     const favoritesOnly = searchParams.get('favoritesOnly') === 'true';
     const searchQuery = searchParams.get('search') || undefined;
+    const collectionId = searchParams.get('collectionId') || undefined;
 
     const items = await Repository.getWardrobeItems(session.userId, {
       category,
       includeArchived,
       favoritesOnly,
       searchQuery,
+      collectionId,
     });
 
     return NextResponse.json({ items });
