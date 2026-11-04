@@ -46,3 +46,4 @@ drop policy if exists "Allow operations on wardrobe_collection_items" on public.
 
 create policy "Allow operations on wardrobe_collections" on public.wardrobe_collections for all using (true) with check (true);
 create policy "Allow operations on wardrobe_collection_items" on public.wardrobe_collection_items for all using (true) with check (true);
+

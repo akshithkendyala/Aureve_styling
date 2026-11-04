@@ -33,3 +33,4 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: error.message || 'Failed to add items to collection' }, { status: 500 });
   }
 }
+

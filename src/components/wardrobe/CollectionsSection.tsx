@@ -802,3 +802,4 @@ export function CollectionsSection({
     </div>
   );
 }
+

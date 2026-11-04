@@ -22,3 +22,4 @@ export async function DELETE(
     return NextResponse.json({ error: error.message || 'Failed to remove item from collection' }, { status: 500 });
   }
 }
+
