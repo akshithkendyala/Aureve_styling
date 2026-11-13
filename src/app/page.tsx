@@ -44,13 +44,13 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#FBF9F6] text-[#18181B] selection:bg-[#221A13] selection:text-[#FAF8F5]">
+    <div className="min-h-screen bg-[#FBF9F6] text-[#18181B] selection:bg-[#221A13] selection:text-[#FAF8F5] overflow-x-hidden">
       {/* Google One Tap integration */}
       <GoogleOneTap />
 
       {/* Top Floating Luxury Header */}
       <header className="sticky top-0 z-50 w-full bg-[#FBF9F6]/85 backdrop-blur-md border-b border-[#EBE5DB]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 sm:h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <span className="font-serif text-2xl sm:text-3xl font-semibold tracking-wider text-[#18181B]">
               AUREVÉ
@@ -137,9 +137,9 @@ export default function LandingPage() {
             <div className="relative rounded-3xl bg-white border border-[#EBE5DB] shadow-2xl overflow-hidden p-4 sm:p-8">
               <div className="absolute top-0 right-0 w-80 h-80 bg-[#F4EFEA] rounded-full blur-3xl -z-0 opacity-70" />
 
-              <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
+              <div className="relative z-10 flex flex-col lg:flex-row items-center gap-6 lg:gap-8">
                 {/* Visual Garment Boxes */}
-                <div className="w-full md:w-1/2 grid grid-cols-2 gap-3">
+                <div className="w-full lg:w-1/2 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-3">
                   <div className="garment-card bg-[#FBF9F6] p-2.5 rounded-2xl">
                     <span className="text-[9px] font-bold uppercase tracking-wider text-[#7E6047]">TOP</span>
                     <div className="relative aspect-[3/4] rounded-xl overflow-hidden mt-1 mb-2">
@@ -198,7 +198,7 @@ export default function LandingPage() {
                 </div>
 
                 {/* AI Reasoning Side */}
-                <div className="w-full md:w-1/2 space-y-4 text-left">
+                <div className="w-full lg:w-1/2 space-y-4 text-left">
                   <div className="inline-flex items-center space-x-2 bg-[#F4EFEA] px-3 py-1 rounded-full text-xs font-medium text-[#7E6047]">
                     <span className="w-2 h-2 rounded-full bg-emerald-500" />
                     <span>Smart Casual Evening • Mumbai (28°C)</span>
@@ -261,7 +261,7 @@ export default function LandingPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {[
             {
               step: '01',
@@ -328,7 +328,7 @@ export default function LandingPage() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {[
               {
                 title: 'Private Digital Wardrobe',

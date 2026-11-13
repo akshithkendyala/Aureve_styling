@@ -98,6 +98,22 @@ export default function BodyScanModal({
       return;
     }
 
+    // Query native camera permission where supported (safe WebKit fallback)
+    if (navigator.permissions?.query) {
+      try {
+        const perm = await navigator.permissions.query({ name: 'camera' as PermissionName });
+        if (perm.state === 'denied') {
+          setCameraState('PERMISSION_DENIED');
+          setErrorMessage(
+            'Camera permission was blocked. Please enable camera access in your browser settings (look for the camera or lock icon in the URL bar), or upload a photo.'
+          );
+          return;
+        }
+      } catch {
+        // WebKit throws on { name: 'camera' }, proceed to getUserMedia
+      }
+    }
+
     // Try starting with ideal constraints, then fallback to basic
     let stream: MediaStream | null = null;
     try {

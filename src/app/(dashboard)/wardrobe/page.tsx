@@ -72,6 +72,15 @@ export default function WardrobePage() {
     if (cat) setSelectedCategory(cat);
   }, [searchParams]);
 
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'collections') {
+      setMainView('collections');
+    } else if (tab === 'wardrobe') {
+      setMainView('wardrobe');
+    }
+  }, [searchParams]);
+
   // Compute category counts
   const counts = {
     all: items.filter((i) => !i.is_archived).length,

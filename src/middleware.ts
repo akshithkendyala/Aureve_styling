@@ -71,6 +71,7 @@ export async function middleware(request: NextRequest) {
   const isProtectedRoute =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/wardrobe') ||
+    pathname.startsWith('/collections') ||
     pathname.startsWith('/create-outfit') ||
     pathname.startsWith('/looks') ||
     pathname.startsWith('/style-profile') ||

@@ -9,11 +9,14 @@ import {
   Sparkles,
   Check,
   AlertCircle,
+  AlertTriangle,
   FlipHorizontal,
   Trash2,
   ChevronLeft,
   ChevronRight,
   ArrowRight,
+  RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
 import { MainCategory, WardrobeItem } from '@/lib/types';
 import {
@@ -182,50 +185,95 @@ export function AddClothingModal({
   onItemAdded,
   onItemsAdded,
 }: AddClothingModalProps) {
-  const [step, setStep] = useState<'choose' | 'camera' | 'analyzing' | 'review'>('choose');
+  const [step, setStep] = useState<'choose' | 'camera' | 'permission_denied' | 'analyzing' | 'review'>('choose');
   const [stagedItems, setStagedItems] = useState<StagedItem[]>([]);
   const [activeReviewIndex, setActiveReviewIndex] = useState<number>(0);
-  const [analyzingIndex, setAnalyzingIndex] = useState<number>(0);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
-  // Camera stream refs
+  // Camera stream refs & state
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [cameraSnapshots, setCameraSnapshots] = useState<string[]>([]);
   const [flashEffect, setFlashEffect] = useState(false);
+  const [isCameraInitializing, setIsCameraInitializing] = useState(false);
+  const [cameraPermission, setCameraPermission] = useState<'prompt' | 'granted' | 'denied' | 'unsupported'>('prompt');
+  const [retryingItemId, setRetryingItemId] = useState<string | null>(null);
 
-  // Clean up camera stream
+  // Check camera permissions natively where supported
+  const checkCameraPermission = useCallback(async (): Promise<'prompt' | 'granted' | 'denied' | 'unsupported'> => {
+    if (typeof window === 'undefined' || !navigator.permissions?.query) {
+      return 'unsupported';
+    }
+    try {
+      const status = await navigator.permissions.query({ name: 'camera' as PermissionName });
+      const current = status.state as 'prompt' | 'granted' | 'denied';
+      setCameraPermission(current);
+      status.onchange = () => {
+        setCameraPermission(status.state as 'prompt' | 'granted' | 'denied');
+      };
+      return current;
+    } catch {
+      // WebKit / Safari throws on { name: 'camera' }
+      return 'unsupported';
+    }
+  }, []);
+
+  // Clean up camera stream tracks
   const stopCameraStream = useCallback(() => {
     if (mediaStream) {
-      mediaStream.getTracks().forEach((track) => track.stop());
+      mediaStream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (e) {
+          console.warn('Track stop error:', e);
+        }
+      });
       setMediaStream(null);
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   }, [mediaStream]);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      checkCameraPermission();
+    } else {
       stopCameraStream();
       setCameraSnapshots([]);
       setStagedItems([]);
       setStep('choose');
       setError('');
+      setIsCameraInitializing(false);
     }
     return () => {
       stopCameraStream();
     };
-  }, [isOpen, stopCameraStream]);
+  }, [isOpen, stopCameraStream, checkCameraPermission]);
 
-  // Start Camera
+  // Start Camera with 3-tier fallback constraints
   const startCamera = async (mode: 'environment' | 'user' = facingMode) => {
     stopCameraStream();
     setError('');
+    setIsCameraInitializing(true);
     setStep('camera');
 
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setError('Camera access is not supported by your browser or environment.');
+      setIsCameraInitializing(false);
+      setCameraPermission('unsupported');
+      setStep('choose');
+      return;
+    }
+
+    let stream: MediaStream | null = null;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // Tier 1: Ideal HD resolution & facingMode
+      stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: mode,
           width: { ideal: 1280 },
@@ -233,16 +281,53 @@ export function AddClothingModal({
         },
         audio: false,
       });
+    } catch (err1: any) {
+      console.warn('Tier 1 camera constraints failed, attempting basic facingMode...', err1);
+      try {
+        // Tier 2: Basic facingMode
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: mode },
+          audio: false,
+        });
+      } catch (err2: any) {
+        console.warn('Tier 2 camera failed, attempting basic video stream...', err2);
+        try {
+          // Tier 3: Any video constraint
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        } catch (err3: any) {
+          console.error('All camera initialization tiers failed:', err3);
+          setIsCameraInitializing(false);
 
+          if (
+            err3.name === 'NotAllowedError' ||
+            err3.name === 'PermissionDeniedError' ||
+            err1?.name === 'NotAllowedError'
+          ) {
+            setCameraPermission('denied');
+            setStep('permission_denied');
+          } else {
+            setError(err3.message || 'Unable to access camera. Please select images from your gallery.');
+            setStep('choose');
+          }
+          return;
+        }
+      }
+    }
+
+    if (stream) {
+      setCameraPermission('granted');
       setMediaStream(stream);
+      setIsCameraInitializing(false);
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        videoRef.current.play().catch((playErr) => {
+          console.warn('Video playback warning:', playErr);
+        });
       }
-    } catch (err: any) {
-      console.error('Camera access error:', err);
-      setError('Unable to access camera. Please select images from your gallery or files.');
-      setStep('choose');
     }
   };
 
@@ -350,113 +435,161 @@ export function AddClothingModal({
     }
   };
 
-  // Run AI Classification sequentially / batch with retry, rate-limit protection, and progress
-  const processBatchAI = async (items: StagedItem[]) => {
-    setStep('analyzing');
-    const updated = [...items];
+  // Helper to execute classification for a single item
+  const classifySingleItem = async (item: StagedItem): Promise<Partial<StagedItem>> => {
+    const maxRetries = 2;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Fast 7s abort timeout per request to keep batch responsive
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 7000);
 
-    for (let i = 0; i < updated.length; i++) {
-      setAnalyzingIndex(i);
-      updated[i].status = 'analyzing';
-      setStagedItems([...updated]);
+        const res = await fetch('/api/wardrobe/classify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: item.imageUrl,
+            clientColorHint: item.clientColorHint,
+          }),
+          signal: controller.signal,
+        });
 
-      let classified = false;
-      const maxRetries = 2;
+        clearTimeout(timeoutId);
 
-      for (let attempt = 0; attempt < maxRetries && !classified; attempt++) {
-        try {
-          // Fast 9s abort timeout per request
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 9000);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.classification) {
+            const c = data.classification;
+            const detectedCategory: MainCategory = c.category || 'tops';
+            const validSubcategories =
+              SUBCATEGORIES_BY_CATEGORY[detectedCategory] || SUBCATEGORIES_BY_CATEGORY.tops;
+            const detectedSubcategory = validSubcategories.includes(c.subcategory)
+              ? c.subcategory
+              : validSubcategories[0];
 
-          const res = await fetch('/api/wardrobe/classify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              image: updated[i].imageUrl,
-              clientColorHint: updated[i].clientColorHint,
-            }),
-            signal: controller.signal,
-          });
-
-          clearTimeout(timeoutId);
-
-          if (res.ok) {
-            const data = await res.json();
-            if (data.success && data.classification) {
-              const c = data.classification;
-              const detectedCategory: MainCategory = c.category || 'tops';
-              const validSubcategories = SUBCATEGORIES_BY_CATEGORY[detectedCategory] || SUBCATEGORIES_BY_CATEGORY.tops;
-              const detectedSubcategory = validSubcategories.includes(c.subcategory)
-                ? c.subcategory
-                : validSubcategories[0];
-
-              // Formulate clean human clothing name
-              const colorName = c.primary_color || updated[i].clientColorHint || 'Black';
-              let finalName = c.name;
-              if (!finalName || finalName.toLowerCase().includes('whatsapp') || finalName.toLowerCase().includes('image') || finalName.length < 3) {
-                finalName = `${colorName} ${detectedSubcategory}`;
-              }
-
-              const suggestedCols = Array.isArray(c.suggested_collections)
-                ? c.suggested_collections.map((sc: any) => sc.slug || sc.name)
-                : ['everyday'];
-
-              updated[i] = {
-                ...updated[i],
-                name: finalName,
-                category: detectedCategory,
-                subcategory: detectedSubcategory,
-                primaryColor: colorName,
-                pattern: c.pattern || 'Solid',
-                material: c.material || (detectedCategory === 'accessories' && detectedSubcategory === 'Belt' ? 'Leather' : 'Cotton'),
-                fit: c.fit || (detectedCategory === 'accessories' || detectedCategory === 'footwear' ? 'Not Applicable' : 'Regular'),
-                style: c.style || 'Smart Casual',
-                formality: c.formality || 'Smart Casual',
-                season: c.season && c.season.length > 0 ? c.season : ['All-Season'],
-                collections: suggestedCols.length > 0 ? suggestedCols : ['everyday'],
-                status: 'done',
-              };
-              classified = true;
+            const colorName = c.primary_color || item.clientColorHint || 'Black';
+            let finalName = c.name;
+            if (
+              !finalName ||
+              finalName.toLowerCase().includes('whatsapp') ||
+              finalName.toLowerCase().includes('image') ||
+              finalName.length < 3
+            ) {
+              finalName = `${colorName} ${detectedSubcategory}`;
             }
-          } else if (res.status === 429 || res.status === 503) {
-            // Rate limit encountered, pause before retrying
-            await new Promise((r) => setTimeout(r, 1200));
+
+            const suggestedCols = Array.isArray(c.suggested_collections)
+              ? c.suggested_collections.map((sc: any) => sc.slug || sc.name)
+              : ['everyday'];
+
+            return {
+              name: finalName,
+              category: detectedCategory,
+              subcategory: detectedSubcategory,
+              primaryColor: colorName,
+              pattern: c.pattern || 'Solid',
+              material:
+                c.material ||
+                (detectedCategory === 'accessories' && detectedSubcategory === 'Belt'
+                  ? 'Leather'
+                  : 'Cotton'),
+              fit:
+                c.fit ||
+                (detectedCategory === 'accessories' || detectedCategory === 'footwear'
+                  ? 'Not Applicable'
+                  : 'Regular'),
+              style: c.style || 'Smart Casual',
+              formality: c.formality || 'Smart Casual',
+              season: c.season && c.season.length > 0 ? c.season : ['All-Season'],
+              collections: suggestedCols.length > 0 ? suggestedCols : ['everyday'],
+              status: 'done',
+              errorMsg: undefined,
+            };
           }
-        } catch (err: any) {
-          console.warn(`Classification attempt ${attempt + 1} failed:`, err);
-          if (attempt < maxRetries - 1) {
-            await new Promise((r) => setTimeout(r, 1000));
-          }
+        } else if (res.status === 429 || res.status === 503) {
+          await new Promise((r) => setTimeout(r, 800));
         }
-      }
-
-      if (!classified) {
-        // Honest fallback that does not hallucinate fake T-shirt or Cotton
-        const color = updated[i].clientColorHint || 'Black';
-        updated[i] = {
-          ...updated[i],
-          name: `${color} Piece`,
-          primaryColor: color,
-          category: 'tops',
-          subcategory: 'Other',
-          material: 'Unknown / Not visible',
-          fit: 'Regular',
-          collections: ['everyday'],
-          status: 'done',
-        };
-      }
-
-      setStagedItems([...updated]);
-
-      // Small 250ms spacing between items to stay well within API rate limits
-      if (i < updated.length - 1) {
-        await new Promise((r) => setTimeout(r, 250));
+      } catch (err: any) {
+        console.warn(`Classification attempt ${attempt + 1} failed for item:`, err);
+        if (attempt < maxRetries - 1) {
+          await new Promise((r) => setTimeout(r, 600));
+        }
       }
     }
 
+    // Honest fallback if model could not classify within retries
+    const color = item.clientColorHint || 'Black';
+    return {
+      name: `${color} Piece`,
+      primaryColor: color,
+      category: 'tops',
+      subcategory: 'Other',
+      material: 'Unknown / Not visible',
+      fit: 'Regular',
+      collections: ['everyday'],
+      status: 'error',
+      errorMsg: 'Classification timeout. Please review or adjust details.',
+    };
+  };
+
+  // Controlled Parallel Batch Processing with Concurrency = 3
+  const processBatchAI = async (items: StagedItem[]) => {
+    setStep('analyzing');
+    setStagedItems([...items]);
+
+    let working = [...items];
+    const totalCount = working.length;
+    const CONCURRENCY = 3;
+    let nextIndex = 0;
+
+    const processNext = async () => {
+      while (nextIndex < totalCount) {
+        const currentIndex = nextIndex++;
+
+        // Mark current item as analyzing
+        working = working.map((it, idx) =>
+          idx === currentIndex ? { ...it, status: 'analyzing' } : it
+        );
+        setStagedItems([...working]);
+
+        const result = await classifySingleItem(working[currentIndex]);
+
+        // Update item with result immediately
+        working = working.map((it, idx) =>
+          idx === currentIndex ? { ...it, ...result } : it
+        );
+        setStagedItems([...working]);
+      }
+    };
+
+    // Run concurrency pool of 3 workers
+    const workerPromises = Array.from(
+      { length: Math.min(CONCURRENCY, totalCount) },
+      () => processNext()
+    );
+
+    await Promise.all(workerPromises);
+
     setActiveReviewIndex(0);
     setStep('review');
+  };
+
+  // Retry single failed item in review mode
+  const retrySingleItem = async (indexToRetry: number) => {
+    const item = stagedItems[indexToRetry];
+    if (!item) return;
+
+    setRetryingItemId(item.id);
+    setStagedItems((prev) =>
+      prev.map((it, idx) => (idx === indexToRetry ? { ...it, status: 'analyzing' } : it))
+    );
+
+    const result = await classifySingleItem(item);
+
+    setStagedItems((prev) =>
+      prev.map((it, idx) => (idx === indexToRetry ? { ...it, ...result } : it))
+    );
+    setRetryingItemId(null);
   };
 
   // Active item update in review (User manual edits are authoritative)
@@ -627,9 +760,17 @@ export function AddClothingModal({
           {step === 'choose' && (
             <div className="space-y-6">
               <div className="text-center space-y-1">
-                <h4 className="font-serif text-2xl font-semibold text-[#18181B]">
-                  Add Your Clothes
-                </h4>
+                <div className="flex items-center justify-center space-x-2">
+                  <h4 className="font-serif text-2xl font-semibold text-[#18181B]">
+                    Add Your Clothes
+                  </h4>
+                  {cameraPermission === 'granted' && (
+                    <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
+                      <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                      <span>Camera Ready</span>
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs sm:text-sm text-[#7E6047]">
                   Snap multiple live photos or select pictures directly from your gallery.
                 </p>
@@ -658,6 +799,7 @@ export function AddClothingModal({
                 {/* 2. Multi-image Gallery / Files Option */}
                 <label className="p-6 rounded-2xl bg-white border-2 border-[#EBE5DB] hover:border-[#18181B] flex flex-col items-center justify-center text-center space-y-3 cursor-pointer transition-all hover:shadow-md group active:scale-98">
                   <input
+                    ref={fileInputRef}
                     type="file"
                     multiple
                     accept="image/*"
@@ -681,8 +823,61 @@ export function AddClothingModal({
               <div className="p-4 bg-[#FAF8F5] border border-[#EBE5DB] rounded-2xl flex items-center space-x-3 text-xs text-[#5E4633]">
                 <Sparkles className="w-5 h-5 text-[#9A7B5F] flex-shrink-0" />
                 <p>
-                  <strong>High-Precision AI Vision:</strong> Automatically determines garment silhouette, accurate color spectrum, fabric weave, and tailored fit.
+                  <strong>High-Precision AI Vision:</strong> Powered by accelerated parallel detection. Automatically categorizes silhouette, color, fabric, and proportions in seconds.
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 1.5: Camera Permission Denied Guidance Panel */}
+          {step === 'permission_denied' && (
+            <div className="p-6 bg-white rounded-3xl border border-[#EBE5DB] text-center space-y-5 animate-in fade-in duration-200">
+              <div className="w-14 h-14 rounded-full bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center mx-auto shadow-xs">
+                <Camera className="w-7 h-7 text-[#7E6047]" />
+              </div>
+
+              <div className="space-y-1.5 max-w-md mx-auto">
+                <h4 className="font-serif text-2xl font-semibold text-[#18181B]">
+                  Camera Access Required
+                </h4>
+                <p className="text-xs text-[#7E6047] leading-relaxed">
+                  Your browser blocked camera access. Enable it below, or choose photos directly from your gallery without any interruption.
+                </p>
+              </div>
+
+              <div className="bg-[#FAF8F5] border border-[#EBE5DB] rounded-2xl p-4 text-left text-xs space-y-2 text-[#5E4633] max-w-md mx-auto">
+                <p className="font-semibold text-[#18181B]">How to grant camera permission:</p>
+                <ul className="list-disc pl-4 space-y-1 text-[11px] text-[#7E6047]">
+                  <li>
+                    <strong>iPad & iPhone Safari:</strong> Tap the <em>aA</em> or Website Settings icon in the search bar → <em>Website Settings</em> → <em>Camera</em> → <em>Allow</em>.
+                  </li>
+                  <li>
+                    <strong>Chrome & Android:</strong> Tap the tune/lock icon beside the URL address bar → <em>Permissions</em> → <em>Camera</em> → <em>Allow</em>.
+                  </li>
+                  <li>
+                    <strong>Mac & Windows Desktop:</strong> Click the lock icon in your URL bar and switch Camera to <em>Allow</em>.
+                  </li>
+                </ul>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => startCamera()}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-[#18181B] hover:bg-[#3D2E22] text-[#FAF8F5] rounded-full text-xs font-semibold tracking-wide transition-all shadow-md"
+                >
+                  Try Camera Again
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep('choose');
+                    fileInputRef.current?.click();
+                  }}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-[#FAF8F5] hover:bg-white border border-[#EBE5DB] hover:border-[#18181B] text-[#18181B] rounded-full text-xs font-semibold tracking-wide transition-all"
+                >
+                  Upload from Gallery Instead
+                </button>
               </div>
             </div>
           )}
@@ -691,11 +886,19 @@ export function AddClothingModal({
           {step === 'camera' && (
             <div className="space-y-4">
               <div className="relative aspect-[3/4] max-w-sm mx-auto rounded-3xl overflow-hidden bg-black border-2 border-[#18181B] shadow-2xl">
+                {isCameraInitializing && (
+                  <div className="absolute inset-0 z-30 bg-black/80 flex flex-col items-center justify-center space-y-2 text-white">
+                    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs font-medium">Starting camera…</span>
+                  </div>
+                )}
+
                 <video
                   ref={videoRef}
                   autoPlay
                   playsInline
                   muted
+                  onLoadedMetadata={() => videoRef.current?.play().catch(console.warn)}
                   className="w-full h-full object-cover"
                 />
                 <canvas ref={canvasRef} className="hidden" />
@@ -711,7 +914,7 @@ export function AddClothingModal({
                   <button
                     type="button"
                     onClick={switchCamera}
-                    className="p-2 rounded-full bg-black/60 backdrop-blur-md text-white hover:bg-black"
+                    className="p-2 rounded-full bg-black/60 backdrop-blur-md text-white hover:bg-black transition-colors"
                     title="Flip camera"
                   >
                     <FlipHorizontal className="w-4 h-4" />
@@ -779,57 +982,84 @@ export function AddClothingModal({
             </div>
           )}
 
-          {/* STEP 3: Batch AI Analyzing Animation */}
-          {step === 'analyzing' && (
-            <div className="py-8 flex flex-col items-center justify-center text-center space-y-6">
-              <div className="relative w-36 h-48 rounded-3xl overflow-hidden border-2 border-[#18181B] shadow-2xl">
-                {stagedItems[analyzingIndex]?.imageUrl && (
-                  <Image
-                    src={stagedItems[analyzingIndex].imageUrl}
-                    alt="Scanning garment"
-                    fill
-                    className="object-cover"
-                  />
-                )}
-                <div className="absolute inset-0 ai-scan-shimmer" />
-              </div>
+          {/* STEP 3: Controlled Parallel Batch AI Analyzing Progress */}
+          {step === 'analyzing' && (() => {
+            const completedCount = stagedItems.filter((i) => i.status === 'done' || i.status === 'error').length;
+            const progressPercent = Math.round((completedCount / Math.max(1, stagedItems.length)) * 100);
+            const activeAnalyzing = stagedItems.filter((i) => i.status === 'analyzing');
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-center space-x-2 text-[#18181B]">
-                  <Sparkles className="w-5 h-5 text-[#9A7B5F] animate-spin" />
-                  <h4 className="font-serif text-2xl font-semibold">
-                    Recognizing Piece {analyzingIndex + 1} of {stagedItems.length}…
-                  </h4>
+            return (
+              <div className="py-8 flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in duration-200">
+                {/* Visual Preview of Currently Analyzing Item */}
+                <div className="relative w-36 h-48 rounded-3xl overflow-hidden border-2 border-[#18181B] shadow-2xl">
+                  {activeAnalyzing[0]?.imageUrl || stagedItems[0]?.imageUrl ? (
+                    <Image
+                      src={activeAnalyzing[0]?.imageUrl || stagedItems[0]?.imageUrl}
+                      alt="Scanning garment"
+                      fill
+                      className="object-cover"
+                    />
+                  ) : null}
+                  <div className="absolute inset-0 ai-scan-shimmer" />
                 </div>
-                <p className="text-xs text-[#7E6047] max-w-sm mx-auto">
-                  Isolating garment silhouette, color spectrum, fabric weave, and proportions…
-                </p>
-              </div>
 
-              {/* Progress Thumbnails */}
-              <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-md pt-2">
-                {stagedItems.map((item, idx) => (
-                  <div
-                    key={item.id}
-                    className={`relative w-12 h-14 rounded-xl overflow-hidden border-2 transition-all ${
-                      idx === analyzingIndex
-                        ? 'border-[#18181B] scale-110 shadow-md'
-                        : item.status === 'done'
-                        ? 'border-emerald-600 opacity-90'
-                        : 'border-[#EBE5DB] opacity-40'
-                    }`}
-                  >
-                    <Image src={item.imageUrl} alt={`Piece ${idx + 1}`} fill className="object-cover" />
-                    {item.status === 'done' && (
-                      <div className="absolute inset-0 bg-emerald-900/30 flex items-center justify-center">
-                        <Check className="w-4 h-4 text-white drop-shadow" />
-                      </div>
-                    )}
+                <div className="space-y-2 w-full max-w-md">
+                  <div className="flex items-center justify-center space-x-2 text-[#18181B]">
+                    <Sparkles className="w-5 h-5 text-[#9A7B5F] animate-spin" />
+                    <h4 className="font-serif text-2xl font-semibold">
+                      Analyzing {completedCount} of {stagedItems.length} pieces ({progressPercent}%)
+                    </h4>
                   </div>
-                ))}
+                  <p className="text-xs text-[#7E6047]">
+                    Processing up to 3 pieces in parallel for high-speed wardrobe categorization…
+                  </p>
+
+                  {/* Elegant Luxury Progress Bar */}
+                  <div className="w-full bg-[#FAF8F5] border border-[#EBE5DB] rounded-full h-2.5 overflow-hidden p-0.5 mt-3">
+                    <div
+                      className="bg-[#18181B] h-full rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${Math.max(6, progressPercent)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Progress Thumbnails Strip */}
+                <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-md pt-2">
+                  {stagedItems.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className={`relative w-12 h-14 rounded-xl overflow-hidden border-2 transition-all ${
+                        item.status === 'analyzing'
+                          ? 'border-[#18181B] scale-110 shadow-md ring-2 ring-[#18181B]/20'
+                          : item.status === 'done'
+                          ? 'border-emerald-600 opacity-90'
+                          : item.status === 'error'
+                          ? 'border-amber-500 opacity-90'
+                          : 'border-[#EBE5DB] opacity-40'
+                      }`}
+                    >
+                      <Image src={item.imageUrl} alt={`Piece ${idx + 1}`} fill className="object-cover" />
+                      {item.status === 'done' && (
+                        <div className="absolute inset-0 bg-emerald-900/30 flex items-center justify-center">
+                          <Check className="w-4 h-4 text-white drop-shadow" />
+                        </div>
+                      )}
+                      {item.status === 'error' && (
+                        <div className="absolute inset-0 bg-amber-900/40 flex items-center justify-center">
+                          <AlertTriangle className="w-4 h-4 text-amber-200 drop-shadow" />
+                        </div>
+                      )}
+                      {item.status === 'analyzing' && (
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                          <Sparkles className="w-3.5 h-3.5 text-white animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* STEP 4: Multi-Piece Review & Edit Form */}
           {step === 'review' && activeItem && (
@@ -855,10 +1085,15 @@ export function AddClothingModal({
                           className={`relative w-16 h-20 rounded-xl overflow-hidden border-2 flex-shrink-0 transition-all ${
                             isActive
                               ? 'border-[#18181B] ring-2 ring-[#18181B]/20 scale-105 shadow-md'
+                              : item.status === 'error'
+                              ? 'border-amber-400 opacity-90'
                               : 'border-[#EBE5DB] opacity-70 hover:opacity-100'
                           }`}
                         >
                           <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />
+                          {item.status === 'error' && (
+                            <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-amber-500 ring-1 ring-white" />
+                          )}
                           <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] truncate px-1 py-0.5">
                             {item.subcategory || item.category}
                           </div>
@@ -866,6 +1101,27 @@ export function AddClothingModal({
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* Active Item Warning / Retry Notice if classification had an error */}
+              {activeItem.status === 'error' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-center justify-between text-xs text-amber-800">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-600" />
+                    <span>
+                      {activeItem.errorMsg || 'Auto-categorization delay. Adjust attributes below or retry AI scan.'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => retrySingleItem(activeReviewIndex)}
+                    disabled={retryingItemId === activeItem.id}
+                    className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-amber-800 hover:bg-amber-900 text-white rounded-full text-xs font-semibold transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${retryingItemId === activeItem.id ? 'animate-spin' : ''}`} />
+                    <span>Retry AI</span>
+                  </button>
                 </div>
               )}
 

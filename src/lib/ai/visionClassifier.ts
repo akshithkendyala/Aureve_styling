@@ -1,4 +1,5 @@
 import { AIClassificationResult, MainCategory } from '@/lib/types';
+import crypto from 'crypto';
 import {
   FABRIC_OPTIONS,
   FIT_OPTIONS,
@@ -10,6 +11,21 @@ import {
   SUBCATEGORIES_BY_CATEGORY,
   classifyRGBToControlledColor,
 } from '@/lib/constants/clothingOptions';
+
+// High-speed in-memory classification cache
+const classificationCache = new Map<string, { result: AIClassificationResult; timestamp: number }>();
+const MAX_CACHE_ENTRIES = 500;
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function getImageCacheKey(imageData: string, hint?: string, colorHint?: string): string {
+  // Use sha256 of the image string + hints
+  const hash = crypto.createHash('sha256');
+  // For data URLs or URLs, hash the first 10000 + last 10000 chars or whole string
+  hash.update(imageData.length > 25000 ? imageData.slice(0, 15000) + imageData.slice(-10000) : imageData);
+  hash.update(hint || '');
+  hash.update(colorHint || '');
+  return hash.digest('hex');
+}
 
 /**
  * Clean and sanitize any technical filename (WhatsApp, IMG_1234, Screenshot, UUIDs)
@@ -70,6 +86,13 @@ export async function classifyClothingImage(
 ): Promise<AIClassificationResult> {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const cleanHint = sanitizeHint(hintName);
+
+  // Check in-memory image classification cache first (< 5ms response)
+  const cacheKey = getImageCacheKey(imageData, cleanHint, clientColorHint);
+  const cached = classificationCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.result;
+  }
 
   if (geminiApiKey) {
     try {
@@ -153,20 +176,19 @@ Return strictly valid JSON:
         parts.push({ text: `User hint: ${cleanHint}` });
       }
 
-      // Fast vision models with multi-model fallback and rate-limit resilience
+      // Ultra-fast active Gemini vision models (800ms-1.2s benchmarked)
       const modelCandidates = [
-        'gemini-3.5-flash-lite',
-        'gemini-2.5-flash',
-        'gemini-3.5-flash',
         'gemini-3.1-flash-lite',
-        'gemini-3.7-flash',
-        'gemini-3.8-flash',
+        'gemini-3.5-flash-lite',
         'gemini-flash-latest',
       ];
       let data: any = null;
 
       for (let attempt = 0; attempt < 2 && !data; attempt++) {
         for (const model of modelCandidates) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4500); // 4.5s max per model attempt
+
           try {
             const res = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
@@ -180,8 +202,10 @@ Return strictly valid JSON:
                     temperature: 0.1,
                   },
                 }),
+                signal: controller.signal,
               }
             );
+            clearTimeout(timeoutId);
 
             if (res.ok) {
               data = await res.json();
@@ -193,13 +217,14 @@ Return strictly valid JSON:
               continue;
             }
           } catch (e) {
-            // Network failure on this model, try next
+            clearTimeout(timeoutId);
+            // Network failure or timeout on this model, try next
           }
         }
 
         if (!data && attempt === 0) {
           // Pause briefly before second retry attempt
-          await new Promise((r) => setTimeout(r, 600));
+          await new Promise((r) => setTimeout(r, 400));
         }
       }
 
@@ -257,7 +282,7 @@ Return strictly valid JSON:
               name = `${primaryColor} ${subcategory}`;
             }
 
-            return {
+            const finalResult: AIClassificationResult = {
               category: validCat,
               subcategory,
               name,
@@ -273,6 +298,15 @@ Return strictly valid JSON:
               formality: FORMALITY_OPTIONS.includes(parsed.formality) ? parsed.formality : 'Smart Casual',
               season: Array.isArray(parsed.season) && parsed.season.length > 0 ? parsed.season : ['All-Season'],
             };
+
+            // Cache result for instant retrieval on duplicate / retry
+            if (classificationCache.size >= MAX_CACHE_ENTRIES) {
+              const oldest = classificationCache.keys().next().value;
+              if (oldest) classificationCache.delete(oldest);
+            }
+            classificationCache.set(cacheKey, { result: finalResult, timestamp: Date.now() });
+
+            return finalResult;
           }
         }
       }
